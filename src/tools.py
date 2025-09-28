@@ -9,9 +9,11 @@ the appropriate tool class from the tools/ directory.
 from typing import Any, Dict, List, Optional
 import logging
 from strands import tool
+import os
 
 # Tool imports will be added as tools are implemented
-# from tools.collectors.news_api_collector import NewsAPICollector
+from tools.collectors.news_api_collector import NewsAPICollector
+from tools.utilities.config_manager import ConfigManager
 # from tools.collectors.weather_api_collector import WeatherAPICollector
 # from tools.collectors.browser_collector import BrowserCollector
 # from tools.processors.data_validator import DataValidator
@@ -41,13 +43,33 @@ def collect_news_data(
     Returns:
         Dictionary containing collected news articles and metadata
     """
-    logger.info(f"Tool placeholder: collect_news_data for countries {countries}")
-    return {
-        "success": False,
-        "message": "Tool not yet implemented - will be available in task 2.1",
-        "countries": countries,
-        "category": category,
-    }
+    try:
+        config_manager = ConfigManager()
+        api_key = config_manager.get_config_value("apis.news_api_key")
+        rate_limit = config_manager.get_config_value("apis.rate_limit_requests_per_minute", 60)
+        
+        if not api_key or api_key == "your_news_api_key_here":
+            return {
+                "success": False,
+                "message": "News API key not configured. Please set NEWS_API_KEY environment variable or update config.json",
+                "countries": countries,
+                "category": category,
+            }
+        
+        collector = NewsAPICollector(api_key, rate_limit)
+        response = collector.collect_news(countries, category)
+        
+        logger.info(f"Collected news data for countries {countries}, category {category}")
+        return response.to_dict()
+        
+    except Exception as e:
+        logger.error(f"Error in collect_news_data: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to collect news data: {str(e)}",
+            "countries": countries,
+            "category": category,
+        }
 
 
 @tool
