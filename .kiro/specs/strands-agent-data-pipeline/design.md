@@ -2,7 +2,7 @@
 
 ## Overview
 
-The StrandsAgent Data Pipeline is a comprehensive data collection and processing system designed for deployment on AgentCore. The system implements a multi-stage pipeline that collects data from various sources (APIs and web scraping), processes and standardizes the data, stores it in both relational and object storage, and provides intelligent querying capabilities through RAG (Retrieval-Augmented Generation).
+The StrandsAgents Data Pipeline is a comprehensive data collection and processing system designed for deployment on Bedrock AgentCore. The system implements a multi-stage pipeline that collects data from various sources (APIs and web scraping), processes and standardizes the data, stores it in both relational and object storage, and provides intelligent querying capabilities through RAG (Retrieval-Augmented Generation).
 
 The architecture follows a modular, event-driven design that supports both scheduled autonomous operation and on-demand execution. Optional components provide advanced features like fake news filtering, sentiment analysis, and enhanced metadata generation for improved search capabilities.
 
@@ -16,38 +16,38 @@ graph TB
         A[Agent] --> B[Tool Execution Engine]
         B --> C[Tool Registry]
     end
-    
+
     subgraph "Collection Tools"
         D[News API Tool]
         E[Weather API Tool]
         F[Browser Tool]
     end
-    
+
     subgraph "Processing Tools"
         G[Validator Tool]
         H[Formatter Tool]
         I[Categorizer Tool]
     end
-    
+
     subgraph "Storage Tools"
         J[Database Tool]
         K[S3 Storage Tool]
     end
-    
+
     subgraph "Analysis Tools"
         L[Fake News Filter]
         M[Sentiment Analyzer]
     end
-    
+
     subgraph "Query Tools"
         N[RAG Query Tool]
     end
-    
+
     subgraph "Utility Tools"
         O[Config Tool]
         P[Monitor Tool]
     end
-    
+
     C --> D
     C --> E
     C --> F
@@ -61,7 +61,7 @@ graph TB
     C --> N
     C --> O
     C --> P
-    
+
     subgraph "External Services"
         Q[News APIs]
         R[Weather APIs]
@@ -71,7 +71,7 @@ graph TB
         V[OpenSearch Serverless]
         W[SageMaker Endpoint]
     end
-    
+
     D --> Q
     E --> R
     F --> S
@@ -98,129 +98,90 @@ Each tool is designed as an independent, reusable component with standardized in
 
 ```
 src/
-├── agent.py                 # Main agent entry point
-├── tools.py                 # Tool definitions with @tool decorators
-└── tools/                   # Tool implementation classes and functions
-    ├── __init__.py
-    ├── collectors/
-    │   ├── __init__.py
-    │   ├── news_api_collector.py
-    │   ├── weather_api_collector.py
-    │   └── browser_collector.py
-    ├── processors/
-    │   ├── __init__.py
-    │   ├── data_validator.py
-    │   ├── data_formatter.py
-    │   └── data_categorizer.py
-    ├── storage/
-    │   ├── __init__.py
-    │   ├── database_storage.py
-    │   └── s3_storage.py
-    ├── analyzers/
-    │   ├── __init__.py
-    │   ├── fake_news_filter.py
-    │   └── sentiment_analyzer.py
-    ├── query/
-    │   ├── __init__.py
-    │   └── rag_query.py
-    └── utilities/
-        ├── __init__.py
-        ├── config_manager.py
-        ├── error_handler.py
-        └── data_models.py
+├── agents/                     # Agent layer
+│   └── data_collector_agent.py
+├── tools/                      # Tool implementations (SOLID principles applied here)
+│   ├── collectors/            # Data collection tools
+│   │   ├── base_collector.py  # Abstract base class
+│   │   ├── news_collector.py  # News API collector
+│   │   ├── weather_collector.py # Weather API collector
+│   │   └── web_collector.py   # Web scraping collector
+│   ├── processors/            # Data processing tools
+│   │   ├── base_processor.py  # Abstract base class
+│   │   ├── validator.py       # Data validation
+│   │   ├── formatter.py       # Data formatting
+│   │   └── categorizer.py     # Data categorization
+│   ├── storage/              # Storage tools
+│   │   ├── base_storage.py    # Abstract base class
+│   │   ├── database_storage.py # Database operations
+│   │   └── s3_storage.py      # S3 operations
+│   ├── analyzers/            # Analysis tools (optional)
+│   │   ├── fake_news_filter.py
+│   │   └── sentiment_analyzer.py
+│   ├── query/                # Query tools
+│   │   └── rag_query.py       # RAG query processor
+│   └── shared/               # Shared utilities within tools
+│       ├── exceptions.py     # Tool-specific exceptions
+│       ├── logger.py         # Logging utilities
+│       └── config.py         # Configuration management
+├── agentcore.py              # Main entry point
+└── tools.py                   # Tool function definitions with @tool decorators
 ```
 
-## Tool Specifications and Interfaces
+## Core Components
 
-### Tool Architecture Design Principles
+### 1. Agent Layer
 
-1. **Modularity**: Each tool is self-contained with clear input/output interfaces
-2. **Extensibility**: New tools can be added without modifying existing ones
-3. **Composability**: Tools can be chained together to create complex workflows
-4. **Standardization**: All tools follow consistent interface patterns
-5. **Error Isolation**: Tool failures don't cascade to other tools
+#### StrandsDataPipelineAgent
 
-### Tool Categories and Module Structure
-
-```
-tools/
-├── collectors/
-│   ├── __init__.py
-│   ├── base_collector.py
-│   ├── news_api_collector.py
-│   ├── weather_api_collector.py
-│   └── browser_collector.py
-├── processors/
-│   ├── __init__.py
-│   ├── base_processor.py
-│   ├── data_validator.py
-│   ├── data_formatter.py
-│   └── data_categorizer.py
-├── storage/
-│   ├── __init__.py
-│   ├── base_storage.py
-│   ├── database_tool.py
-│   └── s3_storage_tool.py
-├── analyzers/
-│   ├── __init__.py
-│   ├── base_analyzer.py
-│   ├── fake_news_filter.py
-│   └── sentiment_analyzer.py
-├── query/
-│   ├── __init__.py
-│   ├── base_query.py
-│   └── rag_query_tool.py
-└── utilities/
-    ├── __init__.py
-    ├── config_tool.py
-    ├── monitoring_tool.py
-    └── scheduler_tool.py
-```
-
-### Tool Implementation Pattern
-
-Following the @tool decorator pattern for AgentCore integration:
-
-#### tools.py - Tool Definitions
 ```python
 from typing import Any, Dict, List, Optional
-from tools.collectors.news_api_collector import NewsAPICollector
-from tools.collectors.weather_api_collector import WeatherAPICollector
-from tools.collectors.browser_collector import BrowserCollector
-from tools.processors.data_validator import DataValidator
-from tools.processors.data_formatter import DataFormatter
-from tools.processors.data_categorizer import DataCategorizer
-from tools.storage.database_storage import DatabaseStorage
-from tools.storage.s3_storage import S3Storage
-from tools.analyzers.fake_news_filter import FakeNewsFilter
-from tools.analyzers.sentiment_analyzer import SentimentAnalyzer
-from tools.query.rag_query import RAGQuery
+from presentation.tools.collection_tools import CollectionTools
+from presentation.tools.processing_tools import ProcessingTools
+from presentation.tools.storage_tools import StorageTools
+from presentation.tools.analysis_tools import AnalysisTools
+from presentation.tools.query_tools import QueryTools
+from infrastructure.config.dependency_injection import DIContainer
 
-# Data Collection Tools
+# Data Collection Tools (Following DIP and SRP)
 @tool
 def collect_news_data(countries: List[str], category: str = "general") -> Dict[str, Any]:
     """
     Collect news data from free APIs for specified countries
-    
+
     Args:
         countries: List of country codes (e.g., ['us', 'jp', 'uk'])
         category: News category (general, business, technology, sports, health)
-    
+
     Returns:
         Dictionary containing collected news articles and metadata
     """
-    collector = NewsAPICollector()
-    return collector.collect_news(countries, category)
+    # Dependency injection - depends on abstraction, not concrete implementation
+    container = DIContainer.get_instance()
+    collection_use_case = container.get_use_case('collect_data')
+
+    # Create request DTO
+    request = CollectionRequest(
+        countries=countries,
+        category=category,
+        data_type='news'
+    )
+
+    # Execute use case
+    result = collection_use_case.execute(request)
+
+    # Map domain result to tool response
+    return CollectionMapper.to_tool_response(result)
 
 @tool
 def collect_weather_data(countries: List[str], cities: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Collect weather data from free APIs for specified countries
-    
+
     Args:
         countries: List of country codes
         cities: List of cities (optional, defaults to capitals)
-    
+
     Returns:
         Dictionary containing weather data for specified locations
     """
@@ -231,12 +192,12 @@ def collect_weather_data(countries: List[str], cities: Optional[List[str]] = Non
 def collect_web_data(urls: List[str], data_type: str, selectors: Optional[Dict] = None) -> Dict[str, Any]:
     """
     Collect data from web sources using AgentCore Browser
-    
+
     Args:
         urls: List of URLs to scrape
         data_type: Type of data to collect (blog, social_media, news)
         selectors: CSS selectors for data extraction
-    
+
     Returns:
         Dictionary containing scraped web data formatted to API structure
     """
@@ -248,11 +209,11 @@ def collect_web_data(urls: List[str], data_type: str, selectors: Optional[Dict] 
 def validate_data(data: List[Dict], schema_type: str) -> Dict[str, Any]:
     """
     Validate collected data against predefined schemas
-    
+
     Args:
         data: List of data objects to validate
         schema_type: Schema type (news, weather, social_media)
-    
+
     Returns:
         Dictionary containing validation results and cleaned data
     """
@@ -263,12 +224,12 @@ def validate_data(data: List[Dict], schema_type: str) -> Dict[str, Any]:
 def format_data(raw_data: List[Dict], source_type: int, country: str = "us") -> Dict[str, Any]:
     """
     Format data to standardized NEWS API structure
-    
+
     Args:
         raw_data: Raw data to format
         source_type: Source type (0 for API, 1 for Browser)
         country: Country code for timezone handling
-    
+
     Returns:
         Dictionary containing formatted data
     """
@@ -279,11 +240,11 @@ def format_data(raw_data: List[Dict], source_type: int, country: str = "us") -> 
 def categorize_data(data: List[Dict], use_ai_categorization: bool = False) -> Dict[str, Any]:
     """
     Categorize data into appropriate categories
-    
+
     Args:
         data: Data to categorize
         use_ai_categorization: Whether to use AI for advanced categorization
-    
+
     Returns:
         Dictionary containing categorized data
     """
@@ -295,10 +256,10 @@ def categorize_data(data: List[Dict], use_ai_categorization: bool = False) -> Di
 def store_in_database(categorized_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
     """
     Store categorized data in PostgreSQL/Aurora database
-    
+
     Args:
         categorized_data: Data organized by categories
-    
+
     Returns:
         Dictionary containing storage results and statistics
     """
@@ -309,11 +270,11 @@ def store_in_database(categorized_data: Dict[str, List[Dict]]) -> Dict[str, Any]
 def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None) -> Dict[str, Any]:
     """
     Store JSON data in S3 with prefix structure (country/year/month/day/data-source-name/)
-    
+
     Args:
         data: Data to store in S3
         metadata: Optional metadata for RAG enhancement
-    
+
     Returns:
         Dictionary containing S3 storage results and paths
     """
@@ -325,11 +286,11 @@ def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None) -> Dict[str, 
 def filter_fake_news(content: str, threshold: float = 0.7) -> Dict[str, Any]:
     """
     Filter content for fake news using SageMaker endpoint
-    
+
     Args:
         content: Text content to analyze
         threshold: Credibility threshold (0.0 to 1.0)
-    
+
     Returns:
         Dictionary containing credibility score and filter decision
     """
@@ -340,10 +301,10 @@ def filter_fake_news(content: str, threshold: float = 0.7) -> Dict[str, Any]:
 def analyze_sentiment(content: str) -> Dict[str, Any]:
     """
     Analyze sentiment of text content
-    
+
     Args:
         content: Text content to analyze
-    
+
     Returns:
         Dictionary containing sentiment scores and classifications
     """
@@ -355,11 +316,11 @@ def analyze_sentiment(content: str) -> Dict[str, Any]:
 def query_rag(query: str, max_results: int = 5) -> Dict[str, Any]:
     """
     Process natural language queries using RAG (Retrieval-Augmented Generation)
-    
+
     Args:
         query: Natural language query
         max_results: Maximum number of results to return
-    
+
     Returns:
         Dictionary containing generated response and source citations
     """
@@ -368,35 +329,53 @@ def query_rag(query: str, max_results: int = 5) -> Dict[str, Any]:
 ```
 
 #### agent.py - Main Agent Entry Point
+
 ```python
 from typing import Dict, Any, List
-import logging
-from tools import *  # Import all tool definitions
+from shared.logging.logger_factory import LoggerFactory
+from infrastructure.config.dependency_injection import DIContainer
+from application.use_cases.collect_data_use_case import CollectDataUseCase
+from application.use_cases.process_data_use_case import ProcessDataUseCase
+from application.use_cases.store_data_use_case import StoreDataUseCase
+from application.use_cases.query_data_use_case import QueryDataUseCase
+from application.dto.collection_request import CollectionRequest
+from presentation.mappers.collection_mapper import CollectionMapper
+from shared.exceptions.application_exceptions import ApplicationException
 
 class StrandsDataPipelineAgent:
-    """Main Strands Agent for data pipeline operations"""
-    
-    def __init__(self):
+    """
+    Main Strands Agent for data pipeline operations
+    Follows Single Responsibility Principle - orchestrates use cases
+    """
+
+    def __init__(self, di_container: DIContainer):
         self.agent_id = "strands-data-pipeline"
         self.agent_name = "Strands Data Pipeline Agent"
-        self.logger = logging.getLogger(__name__)
-    
+        self.logger = LoggerFactory.create_logger(__name__)
+        self._di_container = di_container
+
+        # Dependency injection - depends on abstractions
+        self._collect_use_case = di_container.get_use_case('collect_data')
+        self._process_use_case = di_container.get_use_case('process_data')
+        self._store_use_case = di_container.get_use_case('store_data')
+        self._query_use_case = di_container.get_use_case('query_data')
+
     def execute_data_pipeline(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute complete data pipeline workflow using available tools
-        
+
         Args:
             config: Pipeline configuration dictionary
-        
+
         Returns:
             Dictionary containing pipeline execution results
         """
         pipeline_results = {}
-        
+
         try:
             # Step 1: Data Collection
             collected_data = []
-            
+
             if config.get("collect_news", True):
                 news_result = collect_news_data(
                     countries=config.get("countries", ["us", "jp"]),
@@ -405,7 +384,7 @@ class StrandsDataPipelineAgent:
                 pipeline_results["news_collection"] = news_result
                 if news_result.get("success"):
                     collected_data.extend(news_result.get("articles", []))
-            
+
             if config.get("collect_weather", True):
                 weather_result = collect_weather_data(
                     countries=config.get("countries", ["us", "jp"]),
@@ -414,7 +393,7 @@ class StrandsDataPipelineAgent:
                 pipeline_results["weather_collection"] = weather_result
                 if weather_result.get("success"):
                     collected_data.extend(weather_result.get("weather_reports", []))
-            
+
             if config.get("collect_web_data", False) and config.get("web_urls"):
                 web_result = collect_web_data(
                     urls=config.get("web_urls", []),
@@ -424,7 +403,7 @@ class StrandsDataPipelineAgent:
                 pipeline_results["web_collection"] = web_result
                 if web_result.get("success"):
                     collected_data.extend(web_result.get("scraped_data", []))
-            
+
             # Step 2: Data Processing
             if collected_data:
                 # Validation
@@ -433,10 +412,10 @@ class StrandsDataPipelineAgent:
                     schema_type="news"
                 )
                 pipeline_results["validation"] = validation_result
-                
+
                 if validation_result.get("success"):
                     valid_data = validation_result.get("valid_data", [])
-                    
+
                     # Formatting
                     format_result = format_data(
                         raw_data=valid_data,
@@ -444,26 +423,26 @@ class StrandsDataPipelineAgent:
                         country=config.get("primary_country", "us")
                     )
                     pipeline_results["formatting"] = format_result
-                    
+
                     if format_result.get("success"):
                         formatted_data = format_result.get("formatted_data", [])
-                        
+
                         # Categorization
                         categorize_result = categorize_data(
                             data=formatted_data,
                             use_ai_categorization=config.get("use_ai_categorization", False)
                         )
                         pipeline_results["categorization"] = categorize_result
-                        
+
                         # Step 3: Storage
                         if categorize_result.get("success"):
                             categorized_data = categorize_result.get("categorized_data", {})
-                            
+
                             # Database storage
                             if config.get("store_in_database", True):
                                 db_result = store_in_database(categorized_data)
                                 pipeline_results["database_storage"] = db_result
-                            
+
                             # S3 storage
                             if config.get("store_in_s3", True):
                                 s3_result = store_in_s3(
@@ -471,7 +450,7 @@ class StrandsDataPipelineAgent:
                                     metadata=config.get("s3_metadata")
                                 )
                                 pipeline_results["s3_storage"] = s3_result
-                        
+
                         # Step 4: Optional Analysis
                         if config.get("enable_fake_news_filter", False):
                             for item in formatted_data:
@@ -481,20 +460,20 @@ class StrandsDataPipelineAgent:
                                         threshold=config.get("fake_news_threshold", 0.7)
                                     )
                                     item["fake_news_score"] = filter_result
-                        
+
                         if config.get("enable_sentiment_analysis", False):
                             for item in formatted_data:
                                 if item.get("content"):
                                     sentiment_result = analyze_sentiment(item["content"])
                                     item["sentiment"] = sentiment_result
-            
+
             return {
                 "success": True,
                 "message": "Data pipeline executed successfully",
                 "results": pipeline_results,
                 "total_items_processed": len(collected_data)
             }
-            
+
         except Exception as e:
             self.logger.error(f"Pipeline execution failed: {str(e)}")
             return {
@@ -502,15 +481,15 @@ class StrandsDataPipelineAgent:
                 "message": f"Pipeline execution failed: {str(e)}",
                 "results": pipeline_results
             }
-    
+
     def query_data(self, query: str, max_results: int = 5) -> Dict[str, Any]:
         """
         Query stored data using RAG
-        
+
         Args:
             query: Natural language query
             max_results: Maximum number of results
-        
+
         Returns:
             Query results with generated response
         """
@@ -525,6 +504,7 @@ def create_agent() -> StrandsDataPipelineAgent:
 ### 1. Data Collection Tools
 
 #### News API Collector Tool
+
 ```python
 class NewsAPICollectorTool(StrandsAgentTool):
     def __init__(self):
@@ -532,7 +512,7 @@ class NewsAPICollectorTool(StrandsAgentTool):
             tool_name="collect_news_data",
             description="Collect news data from free APIs for specified countries"
         )
-    
+
     def get_input_schema(self) -> Dict[str, Any]:
         return {
             "type": "object",
@@ -550,7 +530,7 @@ class NewsAPICollectorTool(StrandsAgentTool):
             },
             "required": ["countries"]
         }
-    
+
     def execute(self, countries: List[str], category: str = "general", **kwargs) -> ToolResponse:
         """Collect news data from NEWS API for specified countries"""
         try:
@@ -559,7 +539,7 @@ class NewsAPICollectorTool(StrandsAgentTool):
                 # Implementation for NEWS API calls
                 news_data = self._fetch_news_from_api(country, category)
                 collected_data.extend(news_data)
-            
+
             return ToolResponse(
                 success=True,
                 message=f"Successfully collected news data for {len(countries)} countries",
@@ -567,7 +547,7 @@ class NewsAPICollectorTool(StrandsAgentTool):
             )
         except Exception as e:
             return self.handle_error(e)
-    
+
     def _fetch_news_from_api(self, country: str, category: str) -> List[Dict]:
         """Internal method to fetch news from API"""
         # Implementation details
@@ -575,6 +555,7 @@ class NewsAPICollectorTool(StrandsAgentTool):
 ```
 
 #### Weather API Collector Tool
+
 ```python
 class WeatherAPICollectorTool(StrandsAgentTool):
     def __init__(self):
@@ -582,7 +563,7 @@ class WeatherAPICollectorTool(StrandsAgentTool):
             tool_name="collect_weather_data",
             description="Collect weather data from free APIs for specified countries"
         )
-    
+
     def get_input_schema(self) -> Dict[str, Any]:
         return {
             "type": "object",
@@ -600,7 +581,7 @@ class WeatherAPICollectorTool(StrandsAgentTool):
             },
             "required": ["countries"]
         }
-    
+
     def execute(self, countries: List[str], cities: List[str] = None, **kwargs) -> ToolResponse:
         """Collect weather data from weather APIs"""
         try:
@@ -609,7 +590,7 @@ class WeatherAPICollectorTool(StrandsAgentTool):
                 city = cities[countries.index(country)] if cities else self._get_capital(country)
                 data = self._fetch_weather_data(country, city)
                 weather_data.append(data)
-            
+
             return ToolResponse(
                 success=True,
                 message=f"Successfully collected weather data for {len(countries)} locations",
@@ -620,6 +601,7 @@ class WeatherAPICollectorTool(StrandsAgentTool):
 ```
 
 #### Browser Collector Tool
+
 ```python
 class BrowserCollectorTool(StrandsAgentTool):
     def __init__(self, agent_core):
@@ -628,7 +610,7 @@ class BrowserCollectorTool(StrandsAgentTool):
             description="Collect data from web sources using AgentCore Browser"
         )
         self.agent_core = agent_core
-    
+
     def get_input_schema(self) -> Dict[str, Any]:
         return {
             "type": "object",
@@ -650,7 +632,7 @@ class BrowserCollectorTool(StrandsAgentTool):
             },
             "required": ["urls", "data_type"]
         }
-    
+
     def execute(self, urls: List[str], data_type: str, selectors: Dict = None, **kwargs) -> ToolResponse:
         """Collect data using AgentCore Browser"""
         try:
@@ -659,7 +641,7 @@ class BrowserCollectorTool(StrandsAgentTool):
                     success=False,
                     message="Browser session not available"
                 )
-            
+
             collected_data = []
             for url in urls:
                 # Use AgentCore Browser to navigate and extract data
@@ -668,7 +650,7 @@ class BrowserCollectorTool(StrandsAgentTool):
                     # Format to match API structure
                     formatted_data = self._format_to_api_structure(page_data, data_type)
                     collected_data.append(formatted_data)
-            
+
             return ToolResponse(
                 success=True,
                 message=f"Successfully collected data from {len(collected_data)} sources",
@@ -676,12 +658,12 @@ class BrowserCollectorTool(StrandsAgentTool):
             )
         except Exception as e:
             return self.handle_error(e)
-    
+
     def _scrape_page(self, url: str, data_type: str, selectors: Dict) -> Dict:
         """Scrape data from a single page using AgentCore Browser"""
         # Implementation using AgentCore Browser API
         pass
-    
+
     def _format_to_api_structure(self, raw_data: Dict, data_type: str) -> Dict:
         """Format scraped data to match NEWS API structure"""
         return {
@@ -699,6 +681,7 @@ class BrowserCollectorTool(StrandsAgentTool):
 ### 2. Data Processing Tools
 
 #### Data Validator Tool
+
 ```python
 class DataValidatorTool(StrandsAgentTool):
     def __init__(self):
@@ -706,7 +689,7 @@ class DataValidatorTool(StrandsAgentTool):
             tool_name="validate_data",
             description="Validate collected data against predefined schemas"
         )
-    
+
     def get_input_schema(self) -> Dict[str, Any]:
         return {
             "type": "object",
@@ -724,23 +707,23 @@ class DataValidatorTool(StrandsAgentTool):
             },
             "required": ["data", "schema_type"]
         }
-    
+
     def execute(self, data: List[Dict], schema_type: str, **kwargs) -> ToolResponse:
         """Validate data against predefined schemas"""
         try:
             validation_results = []
             valid_data = []
             invalid_data = []
-            
+
             schema = self._get_schema(schema_type)
-            
+
             for item in data:
                 is_valid, errors = self._validate_item(item, schema)
                 if is_valid:
                     valid_data.append(item)
                 else:
                     invalid_data.append({"data": item, "errors": errors})
-            
+
             return ToolResponse(
                 success=True,
                 message=f"Validated {len(data)} items: {len(valid_data)} valid, {len(invalid_data)} invalid",
@@ -759,6 +742,7 @@ class DataValidatorTool(StrandsAgentTool):
 ```
 
 #### Data Formatter Tool
+
 ```python
 class DataFormatterTool(StrandsAgentTool):
     def __init__(self):
@@ -766,7 +750,7 @@ class DataFormatterTool(StrandsAgentTool):
             tool_name="format_data",
             description="Format data to standardized NEWS API structure"
         )
-    
+
     def get_input_schema(self) -> Dict[str, Any]:
         return {
             "type": "object",
@@ -788,12 +772,12 @@ class DataFormatterTool(StrandsAgentTool):
             },
             "required": ["raw_data", "source_type"]
         }
-    
+
     def execute(self, raw_data: List[Dict], source_type: int, country: str = "us", **kwargs) -> ToolResponse:
         """Format data to standardized structure"""
         try:
             formatted_data = []
-            
+
             for item in raw_data:
                 formatted_item = {
                     "author": self._extract_author(item),
@@ -809,7 +793,7 @@ class DataFormatterTool(StrandsAgentTool):
                     "source_name": self._extract_source_name(item)
                 }
                 formatted_data.append(formatted_item)
-            
+
             return ToolResponse(
                 success=True,
                 message=f"Successfully formatted {len(formatted_data)} items",
@@ -820,6 +804,7 @@ class DataFormatterTool(StrandsAgentTool):
 ```
 
 #### Data Categorizer Tool
+
 ```python
 class DataCategorizerTool(StrandsAgentTool):
     def __init__(self):
@@ -827,7 +812,7 @@ class DataCategorizerTool(StrandsAgentTool):
             tool_name="categorize_data",
             description="Categorize data into appropriate categories"
         )
-    
+
     def get_input_schema(self) -> Dict[str, Any]:
         return {
             "type": "object",
@@ -845,7 +830,7 @@ class DataCategorizerTool(StrandsAgentTool):
             },
             "required": ["data"]
         }
-    
+
     def execute(self, data: List[Dict], use_ai_categorization: bool = False, **kwargs) -> ToolResponse:
         """Categorize data into appropriate categories"""
         try:
@@ -856,11 +841,11 @@ class DataCategorizerTool(StrandsAgentTool):
                 "social_media": [],
                 "other": []
             }
-            
+
             for item in data:
                 category = self._determine_category(item, use_ai_categorization)
                 categorized_data[category].append(item)
-            
+
             return ToolResponse(
                 success=True,
                 message=f"Successfully categorized {len(data)} items",
@@ -873,16 +858,17 @@ class DataCategorizerTool(StrandsAgentTool):
 ### 3. Storage Tools
 
 #### Database Storage Tool
+
 ```python
 class DatabaseStorageTool(BaseTool):
     def execute(self, data: List[Dict], category: str, **kwargs) -> ToolResult:
         """
         Store data in PostgreSQL/Aurora database
-        
+
         Args:
             data: Processed data to store
             category: Data category for table selection
-            
+
         Returns:
             ToolResult with storage confirmation
         """
@@ -890,16 +876,17 @@ class DatabaseStorageTool(BaseTool):
 ```
 
 #### S3 Storage Tool
+
 ```python
 class S3StorageTool(BaseTool):
     def execute(self, data: Dict, metadata: Dict = None, **kwargs) -> ToolResult:
         """
         Store JSON data in S3 with prefix structure
-        
+
         Args:
             data: Data to store
             metadata: Optional metadata for RAG enhancement
-            
+
         Returns:
             ToolResult with S3 path and storage confirmation
         """
@@ -909,16 +896,17 @@ class S3StorageTool(BaseTool):
 ### 4. Analysis Tools
 
 #### Fake News Filter Tool
+
 ```python
 class FakeNewsFilterTool(BaseTool):
     def execute(self, content: str, threshold: float = 0.7, **kwargs) -> ToolResult:
         """
         Filter content for fake news using SageMaker endpoint
-        
+
         Args:
             content: Text content to analyze
             threshold: Credibility threshold
-            
+
         Returns:
             ToolResult with credibility score and filter decision
         """
@@ -926,15 +914,16 @@ class FakeNewsFilterTool(BaseTool):
 ```
 
 #### Sentiment Analysis Tool
+
 ```python
 class SentimentAnalysisTool(BaseTool):
     def execute(self, content: str, **kwargs) -> ToolResult:
         """
         Analyze sentiment of text content
-        
+
         Args:
             content: Text content to analyze
-            
+
         Returns:
             ToolResult with sentiment scores and classifications
         """
@@ -944,16 +933,17 @@ class SentimentAnalysisTool(BaseTool):
 ### 5. Query Tools
 
 #### RAG Query Tool
+
 ```python
 class RAGQueryTool(BaseTool):
     def execute(self, query: str, max_results: int = 5, **kwargs) -> ToolResult:
         """
         Process natural language queries using RAG
-        
+
         Args:
             query: Natural language query
             max_results: Maximum number of results to return
-            
+
         Returns:
             ToolResult with generated response and source citations
         """
@@ -963,17 +953,18 @@ class RAGQueryTool(BaseTool):
 ### 6. Utility Tools
 
 #### Configuration Tool
+
 ```python
 class ConfigurationTool(BaseTool):
     def execute(self, action: str, config_key: str = None, config_value: Any = None, **kwargs) -> ToolResult:
         """
         Manage system configuration
-        
+
         Args:
             action: Configuration action (get, set, list)
             config_key: Configuration key
             config_value: Configuration value (for set action)
-            
+
         Returns:
             ToolResult with configuration data
         """
@@ -981,15 +972,16 @@ class ConfigurationTool(BaseTool):
 ```
 
 #### Monitoring Tool
+
 ```python
 class MonitoringTool(BaseTool):
     def execute(self, metric_type: str, **kwargs) -> ToolResult:
         """
         Collect system metrics and status
-        
+
         Args:
             metric_type: Type of metrics to collect
-            
+
         Returns:
             ToolResult with system metrics
         """
@@ -1001,130 +993,130 @@ class MonitoringTool(BaseTool):
 ```python
 class StrandsDataPipelineAgent(StrandsAgentCore):
     """Main Strands Agent for data pipeline operations"""
-    
+
     def __init__(self):
         super().__init__(
             agent_id="strands-data-pipeline",
             agent_name="Strands Data Pipeline Agent"
         )
         self._register_all_tools()
-    
+
     def _register_all_tools(self):
         """Register all available tools"""
         # Data Collection Tools
         self.register_tool(NewsAPICollectorTool())
         self.register_tool(WeatherAPICollectorTool())
         self.register_tool(BrowserCollectorTool(self))
-        
+
         # Data Processing Tools
         self.register_tool(DataValidatorTool())
         self.register_tool(DataFormatterTool())
         self.register_tool(DataCategorizerTool())
-        
+
         # Storage Tools
         self.register_tool(DatabaseStorageTool())
         self.register_tool(S3StorageTool())
-        
+
         # Analysis Tools (Optional)
         self.register_tool(FakeNewsFilterTool())
         self.register_tool(SentimentAnalysisTool())
-        
+
         # Query Tools
         self.register_tool(RAGQueryTool())
-        
+
         # Utility Tools
         self.register_tool(ConfigurationTool())
         self.register_tool(MonitoringTool())
-    
+
     def execute_data_pipeline(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Execute complete data pipeline workflow"""
         pipeline_results = {}
-        
+
         try:
             # Step 1: Data Collection
             if config.get("collect_news", True):
-                news_result = self.execute_tool("collect_news_data", 
+                news_result = self.execute_tool("collect_news_data",
                                               countries=config.get("countries", ["us", "jp"]))
                 pipeline_results["news_collection"] = news_result
-            
+
             if config.get("collect_weather", True):
                 weather_result = self.execute_tool("collect_weather_data",
                                                  countries=config.get("countries", ["us", "jp"]))
                 pipeline_results["weather_collection"] = weather_result
-            
+
             if config.get("collect_web_data", False):
                 web_result = self.execute_tool("collect_web_data",
                                              urls=config.get("web_urls", []),
                                              data_type="blog")
                 pipeline_results["web_collection"] = web_result
-            
+
             # Step 2: Data Processing
             all_collected_data = self._combine_collected_data(pipeline_results)
-            
+
             validation_result = self.execute_tool("validate_data",
                                                 data=all_collected_data,
                                                 schema_type="news")
             pipeline_results["validation"] = validation_result
-            
+
             if validation_result.success:
                 format_result = self.execute_tool("format_data",
                                                 raw_data=validation_result.data["valid_data"],
                                                 source_type=0)
                 pipeline_results["formatting"] = format_result
-                
+
                 categorize_result = self.execute_tool("categorize_data",
                                                     data=format_result.data["formatted_data"])
                 pipeline_results["categorization"] = categorize_result
-            
+
             # Step 3: Storage
             if "categorization" in pipeline_results and pipeline_results["categorization"].success:
                 categorized_data = pipeline_results["categorization"].data["categorized_data"]
-                
+
                 # Store in database
                 db_result = self.execute_tool("store_in_database",
                                             categorized_data=categorized_data)
                 pipeline_results["database_storage"] = db_result
-                
+
                 # Store in S3
                 s3_result = self.execute_tool("store_in_s3",
                                             data=categorized_data)
                 pipeline_results["s3_storage"] = s3_result
-            
+
             # Step 4: Optional Analysis
             if config.get("enable_fake_news_filter", False):
                 # Apply fake news filtering
                 pass
-            
+
             if config.get("enable_sentiment_analysis", False):
                 # Apply sentiment analysis
                 pass
-            
+
             return {
                 "success": True,
                 "message": "Data pipeline executed successfully",
                 "results": pipeline_results
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
                 "message": f"Pipeline execution failed: {str(e)}",
                 "results": pipeline_results
             }
-    
+
     def _combine_collected_data(self, pipeline_results: Dict) -> List[Dict]:
         """Combine data from all collection sources"""
         combined_data = []
-        
+
         if "news_collection" in pipeline_results:
             combined_data.extend(pipeline_results["news_collection"].data.get("articles", []))
-        
+
         if "weather_collection" in pipeline_results:
             combined_data.extend(pipeline_results["weather_collection"].data.get("weather_reports", []))
-        
+
         if "web_collection" in pipeline_results:
             combined_data.extend(pipeline_results["web_collection"].data.get("scraped_data", []))
-        
+
         return combined_data
 
 # AgentCore Integration Entry Point
@@ -1136,7 +1128,7 @@ def create_strands_agent() -> StrandsDataPipelineAgent:
 # Example usage for AgentCore deployment
 if __name__ == "__main__":
     agent = create_strands_agent()
-    
+
     # Example pipeline configuration
     config = {
         "countries": ["us", "jp", "uk"],
@@ -1146,7 +1138,7 @@ if __name__ == "__main__":
         "enable_fake_news_filter": False,
         "enable_sentiment_analysis": True
     }
-    
+
     result = agent.execute_data_pipeline(config)
     print(result)
 ```
@@ -1174,6 +1166,7 @@ class StandardizedData:
 ### Database Schema
 
 #### Articles Table
+
 ```sql
 CREATE TABLE articles (
     id SERIAL PRIMARY KEY,
@@ -1194,6 +1187,7 @@ CREATE TABLE articles (
 ```
 
 #### Sentiment Analysis Table
+
 ```sql
 CREATE TABLE sentiment_analysis (
     id SERIAL PRIMARY KEY,
@@ -1212,27 +1206,28 @@ CREATE TABLE sentiment_analysis (
 **Example**: `japan/2025/09/28/newsapi/article_123456.json`
 
 **JSON Structure**:
+
 ```json
 {
-    "data": {
-        "author": "John Doe",
-        "title": "Sample News Title",
-        "summary": "Brief summary of the article",
-        "url": "https://example.com/article",
-        "publishedAt": "2025-09-28T15:30:00+09:00",
-        "content": "Full article content...",
-        "collectAt": "2025-09-28T06:30:00Z",
-        "sourceType": 0,
-        "country": "japan",
-        "category": "news",
-        "source_name": "newsapi"
-    },
-    "metadata": {
-        "keywords": ["politics", "economy", "japan"],
-        "semantic_tags": ["government", "policy"],
-        "summary_generated": "AI-generated summary for RAG",
-        "processing_timestamp": "2025-09-28T06:30:15Z"
-    }
+  "data": {
+    "author": "John Doe",
+    "title": "Sample News Title",
+    "summary": "Brief summary of the article",
+    "url": "https://example.com/article",
+    "publishedAt": "2025-09-28T15:30:00+09:00",
+    "content": "Full article content...",
+    "collectAt": "2025-09-28T06:30:00Z",
+    "sourceType": 0,
+    "country": "japan",
+    "category": "news",
+    "source_name": "newsapi"
+  },
+  "metadata": {
+    "keywords": ["politics", "economy", "japan"],
+    "semantic_tags": ["government", "policy"],
+    "summary_generated": "AI-generated summary for RAG",
+    "processing_timestamp": "2025-09-28T06:30:15Z"
+  }
 }
 ```
 
@@ -1241,21 +1236,25 @@ CREATE TABLE sentiment_analysis (
 ### Error Categories and Strategies
 
 1. **API Rate Limiting**
+
    - Implement exponential backoff
    - Queue requests for retry
    - Log rate limit events
 
 2. **Network Failures**
+
    - Retry with circuit breaker pattern
    - Fallback to cached data when available
    - Graceful degradation
 
 3. **Data Validation Errors**
+
    - Log invalid data for review
    - Continue processing valid data
    - Generate data quality reports
 
 4. **Storage Failures**
+
    - Implement retry logic with exponential backoff
    - Use dead letter queues for failed operations
    - Maintain data consistency across storage systems
@@ -1348,19 +1347,19 @@ strands_agent:
     weather_api:
       enabled: true
       api_key: "${WEATHER_API_KEY}"
-  
+
   optional_features:
     fake_news_filter:
       enabled: false
       sagemaker_endpoint: "${SAGEMAKER_ENDPOINT}"
       threshold: 0.7
-    
+
     sentiment_analysis:
       enabled: true
-      
+
     rag_interface:
       enabled: true
-  
+
   storage:
     postgresql:
       connection_string: "${DB_CONNECTION_STRING}"
