@@ -1,0 +1,40 @@
+# Strands framework
+strands
+bedrock-agentcore
+
+# Core dependencies
+requests>=2.31.0
+python-dateutil>=2.8.2
+pytz>=2023.3
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Database
+psycopg2-binary>=2.9.7
+sqlalchemy>=2.0.0
+
+# AWS services
+boto3>=1.28.0
+botocore>=1.31.0
+
+# Configuration and validation
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+
+# Logging and monitoring
+structlog>=23.1.0
+
+# Optional dependencies for analysis
+# scikit-learn>=1.3.0  # For sentiment analysis
+# transformers>=4.30.0  # For HuggingFace models
+# torch>=2.0.0  # For deep learning models
+
+# Development dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.0
+black>=23.7.0
+flake8>=6.0.0
+mypy>=1.5.0
