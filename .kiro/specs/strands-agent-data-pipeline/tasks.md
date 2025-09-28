@@ -24,7 +24,7 @@
   - Write unit tests for weather data collection and validation
   - _Requirements: 1.2, 1.3, 1.4_
 
-- [ ] 2.3 Create Browser collector tool for web scraping
+- [x] 2.3 Create Browser collector tool for web scraping
 
   - Implement BrowserCollector class in tools/collectors/browser_collector.py
   - Integrate with AgentCore Browser for blog and social media data collection
