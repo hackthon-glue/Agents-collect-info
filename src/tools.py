@@ -13,8 +13,8 @@ import os
 
 # Tool imports will be added as tools are implemented
 from tools.collectors.news_api_collector import NewsAPICollector
+from tools.collectors.weather_api_collector import WeatherAPICollector
 from tools.utilities.config_manager import ConfigManager
-# from tools.collectors.weather_api_collector import WeatherAPICollector
 # from tools.collectors.browser_collector import BrowserCollector
 # from tools.processors.data_validator import DataValidator
 # from tools.processors.data_formatter import DataFormatter
@@ -77,22 +77,42 @@ def collect_weather_data(
     countries: List[str], cities: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
-    Collect weather data from free APIs for specified countries
+    Collect weather data from OpenWeatherMap API for specified countries
 
     Args:
-        countries: List of country codes
+        countries: List of country codes (e.g., ['us', 'jp', 'uk'])
         cities: List of cities (optional, defaults to capitals)
 
     Returns:
         Dictionary containing weather data for specified locations
     """
-    logger.info(f"Tool placeholder: collect_weather_data for countries {countries}")
-    return {
-        "success": False,
-        "message": "Tool not yet implemented - will be available in task 2.2",
-        "countries": countries,
-        "cities": cities,
-    }
+    try:
+        config_manager = ConfigManager()
+        api_key = config_manager.get_config_value("apis.weather_api_key")
+        rate_limit = config_manager.get_config_value("apis.rate_limit_requests_per_minute", 60)
+        
+        if not api_key or api_key == "your_weather_api_key_here":
+            return {
+                "success": False,
+                "message": "Weather API key not configured. Please set WEATHER_API_KEY environment variable or update config.json",
+                "countries": countries,
+                "cities": cities,
+            }
+        
+        collector = WeatherAPICollector(api_key, rate_limit)
+        response = collector.collect_weather(countries, cities)
+        
+        logger.info(f"Collected weather data for countries {countries}")
+        return response.to_dict()
+        
+    except Exception as e:
+        logger.error(f"Error in collect_weather_data: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to collect weather data: {str(e)}",
+            "countries": countries,
+            "cities": cities,
+        }
 
 
 @tool
