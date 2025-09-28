@@ -7,8 +7,8 @@
   - Create error handling and configuration management classes
   - _Requirements: 12.1, 12.4_
 
-- [ ] 2. Implement core data collection tools
-- [ ] 2.1 Create News API collector tool
+- [] 2. Implement core data collection tools
+- [x] 2.1 Create News API collector tool
 
   - Implement NewsAPICollector class in tools/collectors/news_api_collector.py
   - Add support for multiple countries and categories with rate limiting
@@ -16,7 +16,7 @@
   - Write unit tests for news data collection and API error handling
   - _Requirements: 1.1, 1.3, 1.4_
 
-- [ ] 2.2 Create Weather API collector tool
+- [x] 2.2 Create Weather API collector tool
 
   - Implement WeatherAPICollector class in tools/collectors/weather_api_collector.py
   - Add support for multiple countries with default capital city mapping
