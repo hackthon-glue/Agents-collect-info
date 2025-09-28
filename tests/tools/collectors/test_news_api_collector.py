@@ -13,15 +13,14 @@ import time
 import sys
 import os
 
-# Add src directory to Python path
+# Add project root to Python path
 test_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(test_dir)))
-src_dir = os.path.join(project_root, "src")
-sys.path.insert(0, src_dir)
+sys.path.insert(0, project_root)
 
-from tools.collectors.news_api_collector import NewsAPICollector
-from tools.utilities.data_models import NewsArticle, SourceType, ToolResponse
-from tools.utilities.error_handler import APIError
+from src.tools.collectors.news_api_collector import NewsAPICollector
+from src.tools.utilities.data_models import NewsArticle, SourceType, ToolResponse
+from src.tools.utilities.error_handler import APIError
 
 
 class TestNewsAPICollector(unittest.TestCase):
