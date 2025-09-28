@@ -6,7 +6,7 @@ Defines the core data structures used throughout the pipeline.
 
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional, Union
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -78,19 +78,27 @@ class NewsArticle:
 
 
 @dataclass
-# ToDo: match the actual response from openweather api
 class WeatherData:
-    """Weather data model"""
+    """Weather data model matching OpenWeatherMap API response"""
 
     location: str
     country: str
     temperature: float
-    description: str
-    humidity: int
+    feels_like: float
+    temp_min: float
+    temp_max: float
     pressure: float
+    humidity: int
+    description: str
+    main_weather: str
     wind_speed: float
+    wind_deg: int
+    clouds: int
+    visibility: int
     collectAt: str
     sourceType: int = 0
+    latitude: float = 0.0
+    longitude: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -98,13 +106,46 @@ class WeatherData:
             "location": self.location,
             "country": self.country,
             "temperature": self.temperature,
-            "description": self.description,
-            "humidity": self.humidity,
+            "feels_like": self.feels_like,
+            "temp_min": self.temp_min,
+            "temp_max": self.temp_max,
             "pressure": self.pressure,
+            "humidity": self.humidity,
+            "description": self.description,
+            "main_weather": self.main_weather,
             "wind_speed": self.wind_speed,
+            "wind_deg": self.wind_deg,
+            "clouds": self.clouds,
+            "visibility": self.visibility,
             "collectAt": self.collectAt,
             "sourceType": self.sourceType,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WeatherData":
+        """Create WeatherData from dictionary"""
+        return cls(
+            location=data.get("location", ""),
+            country=data.get("country", ""),
+            temperature=data.get("temperature", 0.0),
+            feels_like=data.get("feels_like", 0.0),
+            temp_min=data.get("temp_min", 0.0),
+            temp_max=data.get("temp_max", 0.0),
+            pressure=data.get("pressure", 0.0),
+            humidity=data.get("humidity", 0),
+            description=data.get("description", ""),
+            main_weather=data.get("main_weather", ""),
+            wind_speed=data.get("wind_speed", 0.0),
+            wind_deg=data.get("wind_deg", 0),
+            clouds=data.get("clouds", 0),
+            visibility=data.get("visibility", 0),
+            collectAt=data.get("collectAt", ""),
+            sourceType=data.get("sourceType", 0),
+            latitude=data.get("latitude", 0.0),
+            longitude=data.get("longitude", 0.0),
+        )
 
 
 @dataclass
@@ -160,7 +201,7 @@ class ToolResponse:
     message: str
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -208,7 +249,7 @@ class S3StorageConfig:
     ) -> str:
         """Generate S3 prefix based on template"""
         if timestamp is None:
-            timestamp = datetime.utcnow()
+            timestamp = datetime.now(timezone.utc)
 
         return self.prefix_template.format(
             country=country,
