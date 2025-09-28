@@ -64,6 +64,7 @@ from ..utilities.data_models import NewsArticle, SourceType, ToolResponse
 from ..utilities.error_handler import ErrorHandler
 
 
+# TODO: Refactor to have prompt templates on another file
 class BrowserCollector:
     """Collector for web data using AgentCore Browser automation"""
 
@@ -197,6 +198,7 @@ class BrowserCollector:
             self.logger.error(f"Browser automation failed for {url}: {str(e)}")
             return None
 
+    # TODO: Refactor to be scalable to data categories
     def _create_selector_task(self, url: str, selectors: Dict[str, str]) -> str:
         """Create extraction task using CSS selectors"""
         selector_instructions = []

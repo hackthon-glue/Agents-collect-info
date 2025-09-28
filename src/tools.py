@@ -14,8 +14,8 @@ import os
 # Tool imports will be added as tools are implemented
 from tools.collectors.news_api_collector import NewsAPICollector
 from tools.collectors.weather_api_collector import WeatherAPICollector
+from tools.collectors.browser_collector import BrowserCollector
 from tools.utilities.config_manager import ConfigManager
-# from tools.collectors.browser_collector import BrowserCollector
 # from tools.processors.data_validator import DataValidator
 # from tools.processors.data_formatter import DataFormatter
 # from tools.processors.data_categorizer import DataCategorizer
@@ -117,7 +117,7 @@ def collect_weather_data(
 
 @tool
 def collect_web_data(
-    urls: List[str], data_type: str, selectors: Optional[Dict] = None
+    urls: List[str], data_type: str = "blog", selectors: Optional[Dict] = None
 ) -> Dict[str, Any]:
     """
     Collect data from web sources using AgentCore Browser
@@ -130,13 +130,24 @@ def collect_web_data(
     Returns:
         Dictionary containing scraped web data formatted to API structure
     """
-    logger.info(f"Tool placeholder: collect_web_data for {len(urls)} URLs")
-    return {
-        "success": False,
-        "message": "Tool not yet implemented - will be available in task 2.3",
-        "urls": urls,
-        "data_type": data_type,
-    }
+    try:
+        config_manager = ConfigManager()
+        region = config_manager.get_config_value("aws.region", "us-west-2")
+        
+        collector = BrowserCollector(region)
+        response = collector.collect_web_data(urls, data_type, selectors)
+        
+        logger.info(f"Collected web data from {len(urls)} URLs, type: {data_type}")
+        return response.to_dict()
+        
+    except Exception as e:
+        logger.error(f"Error in collect_web_data: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to collect web data: {str(e)}",
+            "urls": urls,
+            "data_type": data_type,
+        }
 
 
 # Data Processing Tools (to be implemented in task 3)
