@@ -9,7 +9,6 @@ from unittest.mock import Mock, patch, MagicMock
 import requests
 from datetime import datetime, timezone
 import time
-
 import sys
 import os
 
