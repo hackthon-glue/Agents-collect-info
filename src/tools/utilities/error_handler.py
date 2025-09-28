@@ -8,7 +8,7 @@ import logging
 import traceback
 import sys
 from typing import Dict, Any, Optional, Type, Union
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -50,7 +50,7 @@ class StrandsError(Exception):
         self.category = category
         self.severity = severity
         self.details = details or {}
-        self.timestamp = datetime.utcnow().isoformat()
+        self.timestamp = datetime.now(timezone.utc).isoformat()
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert error to dictionary for logging/serialization"""
@@ -260,7 +260,7 @@ class ErrorHandler:
         self.error_counts[error_key] = self.error_counts.get(error_key, 0) + 1
 
         # Update last occurrence
-        self.last_errors[error_key] = datetime.utcnow()
+        self.last_errors[error_key] = datetime.now(timezone.utc)
 
     def _generate_error_id(self, error: StrandsError) -> str:
         """Generate a unique error ID for tracking"""
@@ -282,7 +282,7 @@ class ErrorHandler:
             "recent_errors": {
                 k: v.isoformat()
                 for k, v in self.last_errors.items()
-                if (datetime.utcnow() - v).total_seconds() < 3600  # Last hour
+                if (datetime.now(timezone.utc) - v).total_seconds() < 3600  # Last hour
             },
         }
 
