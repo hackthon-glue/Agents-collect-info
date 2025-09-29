@@ -17,6 +17,7 @@ from tools.collectors.weather_api_collector import WeatherAPICollector
 from tools.collectors.browser_collector import BrowserCollector
 from tools.utilities.config_manager import ConfigManager
 from tools.processors.data_validator import DataValidator
+
 # from tools.processors.data_formatter import DataFormatter
 # from tools.processors.data_categorizer import DataCategorizer
 # from tools.storage.database_storage import DatabaseStorage
@@ -46,8 +47,10 @@ def collect_news_data(
     try:
         config_manager = ConfigManager()
         api_key = config_manager.get_config_value("apis.news_api_key")
-        rate_limit = config_manager.get_config_value("apis.rate_limit_requests_per_minute", 60)
-        
+        rate_limit = config_manager.get_config_value(
+            "apis.rate_limit_requests_per_minute", 60
+        )
+
         if not api_key or api_key == "your_news_api_key_here":
             return {
                 "success": False,
@@ -55,13 +58,15 @@ def collect_news_data(
                 "countries": countries,
                 "category": category,
             }
-        
+
         collector = NewsAPICollector(api_key, rate_limit)
         response = collector.collect_news(countries, category)
-        
-        logger.info(f"Collected news data for countries {countries}, category {category}")
+
+        logger.info(
+            f"Collected news data for countries {countries}, category {category}"
+        )
         return response.to_dict()
-        
+
     except Exception as e:
         logger.error(f"Error in collect_news_data: {str(e)}")
         return {
@@ -89,8 +94,10 @@ def collect_weather_data(
     try:
         config_manager = ConfigManager()
         api_key = config_manager.get_config_value("apis.weather_api_key")
-        rate_limit = config_manager.get_config_value("apis.rate_limit_requests_per_minute", 60)
-        
+        rate_limit = config_manager.get_config_value(
+            "apis.rate_limit_requests_per_minute", 60
+        )
+
         if not api_key or api_key == "your_weather_api_key_here":
             return {
                 "success": False,
@@ -98,13 +105,13 @@ def collect_weather_data(
                 "countries": countries,
                 "cities": cities,
             }
-        
+
         collector = WeatherAPICollector(api_key, rate_limit)
         response = collector.collect_weather(countries, cities)
-        
+
         logger.info(f"Collected weather data for countries {countries}")
         return response.to_dict()
-        
+
     except Exception as e:
         logger.error(f"Error in collect_weather_data: {str(e)}")
         return {
@@ -133,13 +140,13 @@ def collect_web_data(
     try:
         config_manager = ConfigManager()
         region = config_manager.get_config_value("aws.region", "us-west-2")
-        
+
         collector = BrowserCollector(region)
         response = collector.collect_web_data(urls, data_type, selectors)
-        
+
         logger.info(f"Collected web data from {len(urls)} URLs, type: {data_type}")
         return response.to_dict()
-        
+
     except Exception as e:
         logger.error(f"Error in collect_web_data: {str(e)}")
         return {
@@ -166,21 +173,27 @@ def validate_data(data: List[Dict], schema_type: str) -> Dict[str, Any]:
     try:
         validator = DataValidator()
         result = validator.validate_data(data, schema_type)
-        
-        logger.info(f"Validated {len(data)} {schema_type} items: {len(result.errors)} errors, {len(result.warnings)} warnings")
-        
+
+        logger.info(
+            f"Validated {len(data)} {schema_type} items: {len(result.errors)} errors, {len(result.warnings)} warnings"
+        )
+
         return {
             "success": result.is_valid,
-            "message": f"Validated {len(data)} {schema_type} items" + 
-                      (f" with {len(result.errors)} errors" if result.errors else " successfully"),
+            "message": f"Validated {len(data)} {schema_type} items"
+            + (
+                f" with {len(result.errors)} errors"
+                if result.errors
+                else " successfully"
+            ),
             "data_count": len(data),
             "schema_type": schema_type,
             "validation_result": result.to_dict(),
             "valid_items": len(data) - len([e for e in result.errors if "Item" in e]),
             "error_count": len(result.errors),
-            "warning_count": len(result.warnings)
+            "warning_count": len(result.warnings),
         }
-        
+
     except Exception as e:
         logger.error(f"Error in validate_data: {str(e)}")
         return {
@@ -188,33 +201,42 @@ def validate_data(data: List[Dict], schema_type: str) -> Dict[str, Any]:
             "message": f"Failed to validate data: {str(e)}",
             "data_count": len(data),
             "schema_type": schema_type,
-            "error": str(e)
+            "error": str(e),
         }
 
 
 @tool
 def format_data(
-    raw_data: List[Dict], source_type: int, country: str = "us"
+    data: List[Dict], data_type: str, country: str = "us"
 ) -> Dict[str, Any]:
     """
-    Format data to standardized NEWS API structure
+    Transform data to standardized JSON format with timezone conversion
 
     Args:
-        raw_data: Raw data to format
-        source_type: Source type (0 for API, 1 for Browser)
-        country: Country code for timezone handling
+        data: List of data objects to format
+        data_type: Type of data (news, weather, social_media)
+        country: Country code for timezone conversion
 
     Returns:
-        Dictionary containing formatted data
+        Dictionary containing formatted data ready for database storage
     """
-    logger.info(f"Tool placeholder: format_data for {len(raw_data)} items")
-    return {
-        "success": False,
-        "message": "Tool not yet implemented - will be available in task 3.2",
-        "data_count": len(raw_data),
-        "source_type": source_type,
-        "country": country,
-    }
+    try:
+        formatter = DataFormatter()
+        response = formatter.format_data(data, data_type, country)
+
+        logger.info(f"Formatted {len(data)} {data_type} items for country {country}")
+        return response.to_dict()
+
+    except Exception as e:
+        logger.error(f"Error in format_data: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to format data: {str(e)}",
+            "data_count": len(data),
+            "data_type": data_type,
+            "country": country,
+            "error": str(e),
+        }
 
 
 @tool
