@@ -7,7 +7,7 @@
   - Create error handling and configuration management classes
   - _Requirements: 12.1, 12.4_
 
-- [] 2. Implement core data collection tools
+- [x] 2. Implement core data collection tools
 - [x] 2.1 Create News API collector tool
 
   - Implement NewsAPICollector class in tools/collectors/news_api_collector.py
@@ -34,7 +34,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
 - [ ] 3. Implement data processing tools
-- [ ] 3.1 Create data validation tool
+- [ｘ] 3.1 Create data validation tool
 
   - Implement DataValidator class in tools/processors/data_validator.py
   - Define schemas for news, weather, and social media data validation
