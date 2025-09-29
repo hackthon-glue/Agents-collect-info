@@ -17,9 +17,8 @@ from tools.collectors.weather_api_collector import WeatherAPICollector
 from tools.collectors.browser_collector import BrowserCollector
 from tools.utilities.config_manager import ConfigManager
 from tools.processors.data_validator import DataValidator
+from tools.processors.data_formatter import DataFormatter
 
-# from tools.processors.data_formatter import DataFormatter
-# from tools.processors.data_categorizer import DataCategorizer
 # from tools.storage.database_storage import DatabaseStorage
 # from tools.storage.s3_storage import S3Storage
 # from tools.analyzers.fake_news_filter import FakeNewsFilter
@@ -237,29 +236,6 @@ def format_data(
             "country": country,
             "error": str(e),
         }
-
-
-@tool
-def categorize_data(
-    data: List[Dict], use_ai_categorization: bool = False
-) -> Dict[str, Any]:
-    """
-    Categorize data into appropriate categories
-
-    Args:
-        data: Data to categorize
-        use_ai_categorization: Whether to use AI for advanced categorization
-
-    Returns:
-        Dictionary containing categorized data
-    """
-    logger.info(f"Tool placeholder: categorize_data for {len(data)} items")
-    return {
-        "success": False,
-        "message": "Tool not yet implemented - will be available in task 3.3",
-        "data_count": len(data),
-        "use_ai_categorization": use_ai_categorization,
-    }
 
 
 # Storage Tools (to be implemented in task 4)

@@ -51,7 +51,7 @@
   - Write unit tests for data transformation and timezone handling
   - _Requirements: 3.1, 3.4_
 
-- [ ] 3.3 Create data categorization tool
+- [x] 3.3 Create data categorization tool (already done in section2)
 
   - Implement DataCategorizer class in tools/processors/data_categorizer.py
   - Categorize data into news, weather, economic indicators, social media, other
