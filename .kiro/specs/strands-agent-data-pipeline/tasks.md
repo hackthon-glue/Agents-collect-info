@@ -42,7 +42,7 @@
   - Write unit tests for schema validation and error handling
   - _Requirements: 3.2, 3.3_
 
-- [ ] 3.2 Create data formatting tool
+- [x] 3.2 Create data formatting tool
 
   - Implement DataFormatter class in tools/processors/data_formatter.py
   - Transform data to standardized JSON format with required fields
