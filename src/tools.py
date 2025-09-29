@@ -16,7 +16,7 @@ from tools.collectors.news_api_collector import NewsAPICollector
 from tools.collectors.weather_api_collector import WeatherAPICollector
 from tools.collectors.browser_collector import BrowserCollector
 from tools.utilities.config_manager import ConfigManager
-# from tools.processors.data_validator import DataValidator
+from tools.processors.data_validator import DataValidator
 # from tools.processors.data_formatter import DataFormatter
 # from tools.processors.data_categorizer import DataCategorizer
 # from tools.storage.database_storage import DatabaseStorage
@@ -163,13 +163,33 @@ def validate_data(data: List[Dict], schema_type: str) -> Dict[str, Any]:
     Returns:
         Dictionary containing validation results and cleaned data
     """
-    logger.info(f"Tool placeholder: validate_data for {len(data)} items")
-    return {
-        "success": False,
-        "message": "Tool not yet implemented - will be available in task 3.1",
-        "data_count": len(data),
-        "schema_type": schema_type,
-    }
+    try:
+        validator = DataValidator()
+        result = validator.validate_data(data, schema_type)
+        
+        logger.info(f"Validated {len(data)} {schema_type} items: {len(result.errors)} errors, {len(result.warnings)} warnings")
+        
+        return {
+            "success": result.is_valid,
+            "message": f"Validated {len(data)} {schema_type} items" + 
+                      (f" with {len(result.errors)} errors" if result.errors else " successfully"),
+            "data_count": len(data),
+            "schema_type": schema_type,
+            "validation_result": result.to_dict(),
+            "valid_items": len(data) - len([e for e in result.errors if "Item" in e]),
+            "error_count": len(result.errors),
+            "warning_count": len(result.warnings)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in validate_data: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to validate data: {str(e)}",
+            "data_count": len(data),
+            "schema_type": schema_type,
+            "error": str(e)
+        }
 
 
 @tool
