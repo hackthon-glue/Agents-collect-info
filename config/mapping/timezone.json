@@ -1,0 +1,12 @@
+{
+  "us": "America/New_York",
+  "jp": "Asia/Tokyo",
+  "gb": "Europe/London",
+  "de": "Europe/Berlin",
+  "fr": "Europe/Paris",
+  "ca": "America/Toronto",
+  "au": "Australia/Sydney",
+  "in": "Asia/Kolkata",
+  "cn": "Asia/Shanghai",
+  "kr": "Asia/Seoul"
+}
