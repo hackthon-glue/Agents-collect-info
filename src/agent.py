@@ -10,10 +10,10 @@ from tools import (
     collect_web_data,
     validate_data,
     format_data,
-    categorize_data,
     store_in_database,
     store_in_s3,
     filter_fake_news,
+    filter_fake_news_batch,
     analyze_sentiment,
     query_rag,
 )
@@ -29,10 +29,10 @@ TOOL_KIT = [
     collect_web_data,
     validate_data,
     format_data,
-    categorize_data,
     store_in_database,
     store_in_s3,
     filter_fake_news,
+    filter_fake_news_batch,
     analyze_sentiment,
     query_rag,
 ]
@@ -41,10 +41,10 @@ TOOL_KIT = [
 MODEL_ID = os.getenv("AGENT_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
 SYSTEM_PROMPT = """あなたは、グローバルなデータ収集と処理を行うStrandsデータパイプラインエージェントです。以下の手順でデータ処理をサポートしてください：
 
-1. まずユーザーの要求に応じて、ニュース、天気、ウェブデータの収集を行います
+1. まずユーザーの要求に応じて、ニュース、天気、ウェブデータなどの収集を行います
 2. 収集したデータの検証と標準化フォーマットへの変換を実行します
-3. データをカテゴリ別に分類し、適切なストレージ（データベース、S3）に保存します
-4. オプション機能として、フェイクニュースフィルタリングや感情分析を実行できます
+3. 標準化されたデータをテーブル定義に従ってAuroraへ格納、およびメタデータと一緒にS3に保存します
+4. フェイクニュースフィルタリングを実行できます
 5. 保存されたデータに対してRAG（検索拡張生成）を使用した自然言語クエリが可能です
 
 各ツールの実行結果をユーザーに分かりやすく伝え、データパイプラインの状況を詳細に報告してください。
