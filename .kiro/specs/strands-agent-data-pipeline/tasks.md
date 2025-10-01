@@ -33,7 +33,7 @@
   - Write unit tests with mocked browser interactions
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 3. Implement data processing tools
+- [x] 3. Implement data processing tools
 - [ｘ] 3.1 Create data validation tool
 
   - Implement DataValidator class in tools/processors/data_validator.py
@@ -59,7 +59,7 @@
   - Write unit tests for categorization logic
   - _Requirements: 4.1_
 
-- [ ] 4. Implement storage tools
+- [x] 4. Implement storage tools
 - [x] 4.1 Create database storage tool
 
   - Implement DatabaseStorage class in tools/storage/database_storage.py
@@ -86,8 +86,8 @@
   - Write unit tests for sync trigger functionality
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 5. Implement optional analysis tools
-- [ ] 5.1 Create fake news filter tool (optional)
+- [x] 5. Implement optional analysis tools
+- [x] 5.1 Create fake news filter tool (optional)
 
   - Implement FakeNewsFilter class in tools/analyzers/fake_news_filter.py
   - Integrate with SageMaker endpoint for HuggingFace model inference
@@ -96,7 +96,7 @@
   - Write unit tests with mocked SageMaker calls
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-- [ ] 5.2 Create sentiment analysis tool (optional)
+- [ー] 5.2 Create sentiment analysis tool (optional)
 
   - Implement SentimentAnalyzer class in tools/analyzers/sentiment_analyzer.py
   - Generate sentiment scores and classifications for text content
@@ -105,8 +105,8 @@
   - Write unit tests for sentiment analysis functionality
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-- [ ] 6. Implement RAG query tool (optional)
-- [ ] 6.1 Create RAG query engine
+- [ー] 6. Implement RAG query tool (optional)
+- [ー] 6.1 Create RAG query engine
 
   - Implement RAGQuery class in tools/query/rag_query.py
   - Integrate with OpenSearch Serverless for vector search
