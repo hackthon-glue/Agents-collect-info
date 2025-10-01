@@ -49,8 +49,10 @@
   },
   
   "sagemaker": {
-    "fake_news_endpoint": "arn:aws:sagemaker:us-east-1:123456789012:endpoint/fake-news-detector",
-    "region": "us-east-1"
+    "fake_news_endpoint": "your-fake-news-endpoint-name",
+    "region": "us-east-1",
+    "fake_news_threshold": 0.7,
+    "request_timeout": 30
   },
   
   "monitoring": {
