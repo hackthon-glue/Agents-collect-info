@@ -259,16 +259,208 @@ class TestS3Storage:
         assert objects == []
 
     @patch("boto3.client")
-    def test_trigger_knowledge_base_sync(self, mock_boto_client, s3_config):
-        """Test Knowledge Base sync trigger"""
-        mock_client = Mock()
-        mock_boto_client.return_value = mock_client
+    def test_init_with_knowledge_base(self, mock_boto_client, s3_config):
+        """Test S3Storage initialization with Knowledge Base configuration"""
+        mock_s3_client = Mock()
+        mock_bedrock_client = Mock()
+        mock_boto_client.side_effect = [mock_s3_client, mock_bedrock_client]
 
-        storage = S3Storage(s3_config)
+        storage = S3Storage(s3_config, "kb-123", "ds-456")
+
+        assert storage.knowledge_base_id == "kb-123"
+        assert storage.data_source_id == "ds-456"
+        assert storage.s3_client == mock_s3_client
+        assert storage.bedrock_agent_client == mock_bedrock_client
+        assert mock_boto_client.call_count == 2
+
+    @patch("boto3.client")
+    def test_store_data_with_kb_sync(self, mock_boto_client, s3_config, sample_data):
+        """Test data storage with Knowledge Base sync"""
+        mock_s3_client = Mock()
+        mock_bedrock_client = Mock()
+        mock_boto_client.side_effect = [mock_s3_client, mock_bedrock_client]
+        
+        mock_bedrock_client.start_ingestion_job.return_value = {
+            'ingestionJob': {'ingestionJobId': 'job-123'}
+        }
+
+        storage = S3Storage(s3_config, "kb-123", "ds-456")
+        result = storage.store_data(sample_data)
+
+        assert result.success is True
+        assert "KB sync triggered for 2 items" in result.message
+        assert result.data["kb_syncs_triggered"] == 2
+        assert mock_bedrock_client.start_ingestion_job.call_count == 2
+
+    @patch("boto3.client")
+    def test_trigger_knowledge_base_sync_success(self, mock_boto_client, s3_config):
+        """Test successful Knowledge Base sync trigger"""
+        mock_s3_client = Mock()
+        mock_bedrock_client = Mock()
+        mock_boto_client.side_effect = [mock_s3_client, mock_bedrock_client]
+        
+        mock_bedrock_client.start_ingestion_job.return_value = {
+            'ingestionJob': {'ingestionJobId': 'job-123'}
+        }
+
+        storage = S3Storage(s3_config, "kb-123", "ds-456")
         result = storage.trigger_knowledge_base_sync("test/key.json")
 
-        # Currently just logs, so should return True
         assert result is True
+        mock_bedrock_client.start_ingestion_job.assert_called_once_with(
+            knowledgeBaseId="kb-123",
+            dataSourceId="ds-456",
+            description="Sync triggered for S3 data upload: test/key.json"
+        )
+
+    @patch("boto3.client")
+    def test_trigger_knowledge_base_sync_no_config(self, mock_boto_client, s3_config):
+        """Test Knowledge Base sync without configuration"""
+        mock_s3_client = Mock()
+        mock_boto_client.return_value = mock_s3_client
+
+        storage = S3Storage(s3_config)  # No KB config
+        result = storage.trigger_knowledge_base_sync("test/key.json")
+
+        assert result is False
+
+    @patch("boto3.client")
+    def test_trigger_knowledge_base_sync_conflict(self, mock_boto_client, s3_config):
+        """Test Knowledge Base sync with conflict (job already running)"""
+        mock_s3_client = Mock()
+        mock_bedrock_client = Mock()
+        mock_boto_client.side_effect = [mock_s3_client, mock_bedrock_client]
+        
+        mock_bedrock_client.start_ingestion_job.side_effect = ClientError(
+            {"Error": {"Code": "ConflictException"}}, "StartIngestionJob"
+        )
+
+        storage = S3Storage(s3_config, "kb-123", "ds-456")
+        result = storage.trigger_knowledge_base_sync("test/key.json")
+
+        assert result is True  # Conflict is considered success
+
+    @patch("boto3.client")
+    def test_trigger_knowledge_base_sync_retry(self, mock_boto_client, s3_config):
+        """Test Knowledge Base sync with retry mechanism"""
+        mock_s3_client = Mock()
+        mock_bedrock_client = Mock()
+        mock_boto_client.side_effect = [mock_s3_client, mock_bedrock_client]
+        
+        # First two calls fail, third succeeds
+        mock_bedrock_client.start_ingestion_job.side_effect = [
+            ClientError({"Error": {"Code": "ThrottlingException"}}, "StartIngestionJob"),
+            ClientError({"Error": {"Code": "ThrottlingException"}}, "StartIngestionJob"),
+            {'ingestionJob': {'ingestionJobId': 'job-123'}}
+        ]
+
+        storage = S3Storage(s3_config, "kb-123", "ds-456")
+        result = storage.trigger_knowledge_base_sync("test/key.json")
+
+        assert result is True
+        assert mock_bedrock_client.start_ingestion_job.call_count == 3
+
+    @patch("boto3.client")
+    def test_trigger_knowledge_base_sync_max_retries(self, mock_boto_client, s3_config):
+        """Test Knowledge Base sync failure after max retries"""
+        mock_s3_client = Mock()
+        mock_bedrock_client = Mock()
+        mock_boto_client.side_effect = [mock_s3_client, mock_bedrock_client]
+        
+        mock_bedrock_client.start_ingestion_job.side_effect = ClientError(
+            {"Error": {"Code": "AccessDeniedException"}}, "StartIngestionJob"
+        )
+
+        storage = S3Storage(s3_config, "kb-123", "ds-456")
+        result = storage.trigger_knowledge_base_sync("test/key.json")
+
+        assert result is False
+        assert mock_bedrock_client.start_ingestion_job.call_count == 3
+
+    @patch("boto3.client")
+    def test_get_ingestion_job_status_success(self, mock_boto_client, s3_config):
+        """Test getting ingestion job status"""
+        mock_s3_client = Mock()
+        mock_bedrock_client = Mock()
+        mock_boto_client.side_effect = [mock_s3_client, mock_bedrock_client]
+        
+        mock_bedrock_client.get_ingestion_job.return_value = {
+            'ingestionJob': {
+                'ingestionJobId': 'job-123',
+                'status': 'IN_PROGRESS',
+                'startedAt': datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
+                'updatedAt': datetime(2024, 1, 15, 10, 35, 0, tzinfo=timezone.utc),
+                'description': 'Test sync',
+                'statistics': {'numberOfDocumentsScanned': 10}
+            }
+        }
+
+        storage = S3Storage(s3_config, "kb-123", "ds-456")
+        status = storage.get_ingestion_job_status("job-123")
+
+        assert status["job_id"] == "job-123"
+        assert status["status"] == "IN_PROGRESS"
+        assert status["statistics"]["numberOfDocumentsScanned"] == 10
+
+    @patch("boto3.client")
+    def test_get_ingestion_job_status_no_config(self, mock_boto_client, s3_config):
+        """Test getting ingestion job status without configuration"""
+        mock_s3_client = Mock()
+        mock_boto_client.return_value = mock_s3_client
+
+        storage = S3Storage(s3_config)  # No KB config
+        status = storage.get_ingestion_job_status("job-123")
+
+        assert "error" in status
+        assert "not configured" in status["error"]
+
+    @patch("boto3.client")
+    def test_list_ingestion_jobs_success(self, mock_boto_client, s3_config):
+        """Test listing ingestion jobs"""
+        mock_s3_client = Mock()
+        mock_bedrock_client = Mock()
+        mock_boto_client.side_effect = [mock_s3_client, mock_bedrock_client]
+        
+        mock_bedrock_client.list_ingestion_jobs.return_value = {
+            'ingestionJobSummaries': [
+                {
+                    'ingestionJobId': 'job-123',
+                    'status': 'COMPLETE',
+                    'startedAt': datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
+                    'updatedAt': datetime(2024, 1, 15, 10, 35, 0, tzinfo=timezone.utc),
+                    'description': 'Test sync 1',
+                    'statistics': {'numberOfDocumentsScanned': 10}
+                },
+                {
+                    'ingestionJobId': 'job-456',
+                    'status': 'IN_PROGRESS',
+                    'startedAt': datetime(2024, 1, 15, 11, 0, 0, tzinfo=timezone.utc),
+                    'updatedAt': datetime(2024, 1, 15, 11, 5, 0, tzinfo=timezone.utc),
+                    'description': 'Test sync 2',
+                    'statistics': {'numberOfDocumentsScanned': 5}
+                }
+            ]
+        }
+
+        storage = S3Storage(s3_config, "kb-123", "ds-456")
+        jobs = storage.list_ingestion_jobs()
+
+        assert len(jobs) == 2
+        assert jobs[0]["job_id"] == "job-123"
+        assert jobs[0]["status"] == "COMPLETE"
+        assert jobs[1]["job_id"] == "job-456"
+        assert jobs[1]["status"] == "IN_PROGRESS"
+
+    @patch("boto3.client")
+    def test_list_ingestion_jobs_no_config(self, mock_boto_client, s3_config):
+        """Test listing ingestion jobs without configuration"""
+        mock_s3_client = Mock()
+        mock_boto_client.return_value = mock_s3_client
+
+        storage = S3Storage(s3_config)  # No KB config
+        jobs = storage.list_ingestion_jobs()
+
+        assert jobs == []
 
     def test_s3_config_generate_prefix(self):
         """Test S3 prefix generation"""
@@ -294,3 +486,41 @@ class TestS3Storage:
         # Should use current date
         assert prefix.startswith("us/")
         assert prefix.endswith("/test-source/")
+
+    @patch("boto3.client")
+    def test_full_pipeline_with_kb_sync(self, mock_boto_client, s3_config, sample_data):
+        """Test complete pipeline with Knowledge Base sync integration"""
+        mock_s3_client = Mock()
+        mock_bedrock_client = Mock()
+        mock_boto_client.side_effect = [mock_s3_client, mock_bedrock_client]
+        
+        mock_bedrock_client.start_ingestion_job.return_value = {
+            'ingestionJob': {'ingestionJobId': 'job-123'}
+        }
+        mock_bedrock_client.get_ingestion_job.return_value = {
+            'ingestionJob': {
+                'ingestionJobId': 'job-123',
+                'status': 'COMPLETE',
+                'startedAt': datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
+                'updatedAt': datetime(2024, 1, 15, 10, 35, 0, tzinfo=timezone.utc),
+                'description': 'Test sync',
+                'statistics': {'numberOfDocumentsScanned': 2}
+            }
+        }
+
+        storage = S3Storage(s3_config, "kb-123", "ds-456")
+        
+        # Store data (should trigger KB sync)
+        store_result = storage.store_data(sample_data)
+        assert store_result.success is True
+        assert store_result.data["kb_syncs_triggered"] == 2
+        
+        # Check job status
+        status = storage.get_ingestion_job_status("job-123")
+        assert status["status"] == "COMPLETE"
+        assert status["statistics"]["numberOfDocumentsScanned"] == 2
+        
+        # Verify all calls were made
+        assert mock_s3_client.put_object.call_count == 2
+        assert mock_bedrock_client.start_ingestion_job.call_count == 2
+        mock_bedrock_client.get_ingestion_job.assert_called_once()

@@ -21,13 +21,17 @@ from ..utilities.error_handler import ErrorHandler
 class S3Storage:
     """S3 storage handler with retry mechanisms and structured prefixes"""
 
-    def __init__(self, config: S3StorageConfig):
+    def __init__(self, config: S3StorageConfig, knowledge_base_id: Optional[str] = None, data_source_id: Optional[str] = None):
         self.config = config
+        self.knowledge_base_id = knowledge_base_id
+        self.data_source_id = data_source_id
         self.logger = logging.getLogger(__name__)
         self.error_handler = ErrorHandler()
 
         try:
             self.s3_client = boto3.client("s3", region_name=config.region)
+            if knowledge_base_id:
+                self.bedrock_agent_client = boto3.client("bedrock-agent", region_name=config.region)
         except NoCredentialsError:
             self.logger.error("AWS credentials not configured")
             raise
@@ -61,16 +65,23 @@ class S3Storage:
             for item in data:
                 result = self._store_single_item(item, metadata)
                 storage_results.append(result)
+                
+                # Trigger Knowledge Base sync for successful uploads
+                if result["success"] and self.knowledge_base_id:
+                    sync_result = self.trigger_knowledge_base_sync(result["s3_key"])
+                    result["kb_sync_triggered"] = sync_result
 
             successful_uploads = sum(1 for r in storage_results if r["success"])
+            kb_syncs_triggered = sum(1 for r in storage_results if r.get("kb_sync_triggered", False))
 
             return ToolResponse(
                 success=successful_uploads > 0,
-                message=f"Stored {successful_uploads}/{len(data)} items individually",
+                message=f"Stored {successful_uploads}/{len(data)} items individually. KB sync triggered for {kb_syncs_triggered} items.",
                 data={
                     "total_items": len(data),
                     "successful_uploads": successful_uploads,
                     "failed_uploads": len(data) - successful_uploads,
+                    "kb_syncs_triggered": kb_syncs_triggered,
                     "storage_results": storage_results,
                     "bucket": self.config.bucket_name,
                 },
@@ -177,24 +188,127 @@ class S3Storage:
                 else:
                     time.sleep(2**attempt)
 
-    def trigger_knowledge_base_sync(self, s3_key: str) -> bool:
+    def trigger_knowledge_base_sync(self, s3_key: Optional[str] = None) -> bool:
         """
         Trigger Knowledge Base synchronization for uploaded data
 
         Args:
-            s3_key: S3 key of uploaded data
+            s3_key: S3 key of uploaded data (optional, triggers full sync if None)
 
         Returns:
             True if sync triggered successfully
         """
-        try:
-            # This would integrate with OpenSearch Serverless
-            # For now, just log the sync trigger
-            self.logger.info(f"Knowledge Base sync triggered for {s3_key}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to trigger Knowledge Base sync: {str(e)}")
+        if not self.knowledge_base_id or not self.data_source_id:
+            self.logger.warning("Knowledge Base ID or Data Source ID not configured")
             return False
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.bedrock_agent_client.start_ingestion_job(
+                    knowledgeBaseId=self.knowledge_base_id,
+                    dataSourceId=self.data_source_id,
+                    description=f"Sync triggered for S3 data upload: {s3_key or 'full sync'}"
+                )
+                
+                ingestion_job_id = response.get('ingestionJob', {}).get('ingestionJobId')
+                self.logger.info(
+                    f"Knowledge Base sync triggered successfully. Job ID: {ingestion_job_id}, S3 key: {s3_key}"
+                )
+                return True
+                
+            except ClientError as e:
+                error_code = e.response["Error"]["Code"]
+                if error_code == "ConflictException":
+                    self.logger.warning(f"Ingestion job already in progress for Knowledge Base {self.knowledge_base_id}")
+                    return True  # Consider this a success since sync is already happening
+                elif attempt == max_retries - 1:
+                    self.logger.error(f"Failed to trigger Knowledge Base sync after {max_retries} attempts: {error_code}")
+                    return False
+                else:
+                    self.logger.warning(f"Sync attempt {attempt + 1} failed: {error_code}, retrying...")
+                    time.sleep(2 ** attempt)
+                    
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    self.logger.error(f"Unexpected error triggering Knowledge Base sync: {str(e)}")
+                    return False
+                else:
+                    self.logger.warning(f"Sync attempt {attempt + 1} failed: {str(e)}, retrying...")
+                    time.sleep(2 ** attempt)
+        
+        return False
+
+    def get_ingestion_job_status(self, job_id: str) -> Dict[str, Any]:
+        """
+        Get the status of a Knowledge Base ingestion job
+
+        Args:
+            job_id: Ingestion job ID
+
+        Returns:
+            Job status information
+        """
+        if not self.knowledge_base_id or not self.data_source_id:
+            return {"error": "Knowledge Base ID or Data Source ID not configured"}
+
+        try:
+            response = self.bedrock_agent_client.get_ingestion_job(
+                knowledgeBaseId=self.knowledge_base_id,
+                dataSourceId=self.data_source_id,
+                ingestionJobId=job_id
+            )
+            
+            job = response.get('ingestionJob', {})
+            return {
+                "job_id": job.get('ingestionJobId'),
+                "status": job.get('status'),
+                "started_at": job.get('startedAt'),
+                "updated_at": job.get('updatedAt'),
+                "description": job.get('description'),
+                "statistics": job.get('statistics', {})
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Failed to get ingestion job status: {str(e)}")
+            return {"error": str(e)}
+
+    def list_ingestion_jobs(self, max_results: int = 10) -> List[Dict[str, Any]]:
+        """
+        List recent ingestion jobs for the Knowledge Base
+
+        Args:
+            max_results: Maximum number of jobs to return
+
+        Returns:
+            List of ingestion job information
+        """
+        if not self.knowledge_base_id or not self.data_source_id:
+            return []
+
+        try:
+            response = self.bedrock_agent_client.list_ingestion_jobs(
+                knowledgeBaseId=self.knowledge_base_id,
+                dataSourceId=self.data_source_id,
+                maxResults=max_results
+            )
+            
+            jobs = []
+            for job in response.get('ingestionJobSummaries', []):
+                jobs.append({
+                    "job_id": job.get('ingestionJobId'),
+                    "status": job.get('status'),
+                    "started_at": job.get('startedAt'),
+                    "updated_at": job.get('updatedAt'),
+                    "description": job.get('description'),
+                    "statistics": job.get('statistics', {})
+                })
+            
+            return jobs
+            
+        except Exception as e:
+            self.logger.error(f"Failed to list ingestion jobs: {str(e)}")
+            return []
 
     def list_stored_data(
         self,
