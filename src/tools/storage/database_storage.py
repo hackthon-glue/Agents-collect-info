@@ -20,6 +20,7 @@ from ..utilities.data_models import (
     ToolResponse,
 )
 from ..utilities.error_handler import ErrorHandler
+from .db_schemas import build_insert_query
 
 
 class DatabaseStorage:
@@ -104,17 +105,10 @@ class DatabaseStorage:
             )
 
     def _insert_news_articles(self, cursor, news_articles: List[NewsArticle]) -> int:
-        """Insert news articles and return count of stored articles"""
-        insert_query = """
-        INSERT INTO public.insights_countrynewsitem (
-            country_id, source_name, author, title, description, 
-            content, url, published_at, collected_at, source_type, category,
-            fake_news_score, raw_response
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (url) DO NOTHING
-        """
-        
+        """Insert news articles using schema-based query"""
+        insert_query = build_insert_query("news")
         stored_count = 0
+        
         for article in news_articles:
             country_id = self._get_country_id(article.country, cursor)
             if not country_id:
@@ -134,18 +128,10 @@ class DatabaseStorage:
         return stored_count
 
     def _insert_weather_data(self, cursor, weather_data: List[WeatherData]) -> int:
-        """Insert weather data and return count of stored records"""
-        insert_query = """
-        INSERT INTO public.insights_countryweather (
-            country_id, city_name, coordinates_lat, coordinates_lon,
-            weather_main, weather_description, temperature, feels_like,
-            temp_min, temp_max, pressure, humidity, wind_speed, wind_direction,
-            cloudiness, visibility, published_at, collected_at, source_type,
-            sunrise_time, sunset_time, raw_response
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        
+        """Insert weather data using schema-based query"""
+        insert_query = build_insert_query("weather")
         stored_count = 0
+        
         for weather in weather_data:
             country_id = self._get_country_id(weather.country, cursor)
             if not country_id:
