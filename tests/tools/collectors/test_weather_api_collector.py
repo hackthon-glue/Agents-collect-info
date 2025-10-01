@@ -237,8 +237,8 @@ class TestWeatherAPICollector(unittest.TestCase):
             "wind_deg",
             "clouds",
             "visibility",
-            "collectAt",
-            "sourceType",
+            "collected_at",
+            "source_type",
             "latitude",
             "longitude",
         ]

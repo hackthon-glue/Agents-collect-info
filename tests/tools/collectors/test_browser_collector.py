@@ -107,7 +107,7 @@ class TestBrowserCollector:
         assert article["title"] == "Test Article"
         assert article["content"] == "Test content"
         assert article["author"] == "Test Author"
-        assert article["sourceType"] == SourceType.BROWSER.value
+        assert article["source_type"] == SourceType.BROWSER.value
 
     @patch(
         "src.tools.collectors.browser_collector.BROWSER_DEPENDENCIES_AVAILABLE", True

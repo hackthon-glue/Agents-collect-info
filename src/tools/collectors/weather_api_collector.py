@@ -179,8 +179,8 @@ class WeatherAPICollector:
                 wind_deg=wind_data.get("deg", 0),
                 clouds=clouds_data.get("all", 0),
                 visibility=api_data.get("visibility", 0),
-                collectAt=collect_time,
-                sourceType=SourceType.API.value,
+                collected_at=collect_time,
+                source_type=SourceType.API.value,
                 latitude=coord_data.get("lat", 0.0),
                 longitude=coord_data.get("lon", 0.0),
             )
