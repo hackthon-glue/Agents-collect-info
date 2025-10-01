@@ -85,27 +85,48 @@ class TestFormatData:
         assert result["success"] is True
 
 
-class TestPlaceholderTools:
-    def test_categorize_data_placeholder(self):
+class TestStoreInDatabase:
+    def test_success(self):
         mock_tool = Mock()
         mock_tool.return_value = {
-            "success": False,
-            "message": "Tool not yet implemented"
+            "success": True,
+            "total_stored": 2,
+            "results": {"news": {"success": True}, "weather": {"success": True}}
         }
         
-        result = mock_tool([{"test": "data"}])
-        assert result["success"] is False
-        assert "not yet implemented" in result["message"]
+        categorized_data = {
+            "news": [{"title": "Test News"}],
+            "weather": [{"location": "Test City"}]
+        }
+        
+        result = mock_tool(categorized_data)
+        assert result["success"] is True
+        assert result["total_stored"] == 2
 
-    def test_store_in_database_placeholder(self):
+    def test_no_database_config(self):
         mock_tool = Mock()
         mock_tool.return_value = {
             "success": False,
-            "message": "Tool not yet implemented"
+            "message": "Database not configured"
         }
         
-        result = mock_tool({"news": [{"title": "test"}]})
+        result = mock_tool({"news": []})
         assert result["success"] is False
+        assert "Database not configured" in result["message"]
+
+    def test_database_error(self):
+        mock_tool = Mock()
+        mock_tool.return_value = {
+            "success": False,
+            "message": "Failed to store data in database: Connection error"
+        }
+        
+        result = mock_tool({"news": []})
+        assert result["success"] is False
+        assert "Failed to store data in database" in result["message"]
+
+
+class TestPlaceholderTools:
 
     def test_store_in_s3_placeholder(self):
         mock_tool = Mock()

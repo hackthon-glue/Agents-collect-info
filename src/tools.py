@@ -18,8 +18,8 @@ from tools.collectors.browser_collector import BrowserCollector
 from tools.utilities.config_manager import ConfigManager
 from tools.processors.data_validator import DataValidator
 from tools.processors.data_formatter import DataFormatter
+from tools.storage.database_storage import DatabaseStorage
 
-# from tools.storage.database_storage import DatabaseStorage
 # from tools.storage.s3_storage import S3Storage
 # from tools.analyzers.fake_news_filter import FakeNewsFilter
 # from tools.analyzers.sentiment_analyzer import SentimentAnalyzer
@@ -245,19 +245,66 @@ def store_in_database(categorized_data: Dict[str, List[Dict]]) -> Dict[str, Any]
     Store categorized data in PostgreSQL/Aurora database
 
     Args:
-        categorized_data: Data organized by categories
+        categorized_data: Data organized by categories (news, weather, etc.)
 
     Returns:
         Dictionary containing storage results and statistics
     """
-    total_items = sum(len(items) for items in categorized_data.values())
-    logger.info(f"Tool placeholder: store_in_database for {total_items} items")
-    return {
-        "success": False,
-        "message": "Tool not yet implemented - will be available in task 4.1",
-        "categories": list(categorized_data.keys()),
-        "total_items": total_items,
-    }
+    try:
+        config_manager = ConfigManager()
+        db_config = config_manager.get_database_config()
+        
+        if not db_config.host or db_config.host == "your_db_host":
+            return {
+                "success": False,
+                "message": "Database not configured. Please set DB_HOST and other database environment variables or update config.json",
+                "categories": list(categorized_data.keys()),
+                "total_items": sum(len(items) for items in categorized_data.values()),
+            }
+        
+        storage = DatabaseStorage(db_config)
+        results = {}
+        total_stored = 0
+        
+        # Store news data
+        if "news" in categorized_data:
+            from tools.utilities.data_models import NewsArticle
+            news_articles = [NewsArticle.from_dict(item) for item in categorized_data["news"]]
+            news_result = storage.store_news_data(news_articles)
+            results["news"] = news_result.to_dict()
+            if news_result.success:
+                total_stored += news_result.data.get("stored_count", 0)
+        
+        # Store weather data
+        if "weather" in categorized_data:
+            from tools.utilities.data_models import WeatherData
+            weather_data = [WeatherData.from_dict(item) for item in categorized_data["weather"]]
+            weather_result = storage.store_weather_data(weather_data)
+            results["weather"] = weather_result.to_dict()
+            if weather_result.success:
+                total_stored += weather_result.data.get("stored_count", 0)
+        
+        storage.close_connections()
+        
+        logger.info(f"Stored {total_stored} items in database across {len(results)} categories")
+        return {
+            "success": True,
+            "message": f"Successfully stored {total_stored} items in database",
+            "categories": list(categorized_data.keys()),
+            "total_items": sum(len(items) for items in categorized_data.values()),
+            "total_stored": total_stored,
+            "results": results,
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in store_in_database: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to store data in database: {str(e)}",
+            "categories": list(categorized_data.keys()),
+            "total_items": sum(len(items) for items in categorized_data.values()),
+            "error": str(e),
+        }
 
 
 @tool
