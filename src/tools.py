@@ -19,8 +19,7 @@ from tools.utilities.config_manager import ConfigManager
 from tools.processors.data_validator import DataValidator
 from tools.processors.data_formatter import DataFormatter
 from tools.storage.database_storage import DatabaseStorage
-
-# from tools.storage.s3_storage import S3Storage
+from tools.storage.s3_storage import S3Storage
 # from tools.analyzers.fake_news_filter import FakeNewsFilter
 # from tools.analyzers.sentiment_analyzer import SentimentAnalyzer
 # from tools.query.rag_query import RAGQuery
@@ -319,13 +318,33 @@ def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None) -> Dict[str, 
     Returns:
         Dictionary containing S3 storage results and paths
     """
-    logger.info(f"Tool placeholder: store_in_s3 for {len(data)} items")
-    return {
-        "success": False,
-        "message": "Tool not yet implemented - will be available in task 4.2",
-        "data_count": len(data),
-        "has_metadata": metadata is not None,
-    }
+    try:
+        config_manager = ConfigManager()
+        s3_config = config_manager.get_s3_config()
+        
+        if not s3_config.bucket_name:
+            return {
+                "success": False,
+                "message": "S3 bucket not configured. Please set S3_BUCKET_NAME environment variable or update config.json",
+                "data_count": len(data),
+                "has_metadata": metadata is not None,
+            }
+        
+        storage = S3Storage(s3_config)
+        response = storage.store_data(data, metadata)
+        
+        logger.info(f"Stored {len(data)} items in S3")
+        return response.to_dict()
+        
+    except Exception as e:
+        logger.error(f"Error in store_in_s3: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to store data in S3: {str(e)}",
+            "data_count": len(data),
+            "has_metadata": metadata is not None,
+            "error": str(e),
+        }
 
 
 # Analysis Tools (to be implemented in task 5)

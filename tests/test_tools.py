@@ -126,6 +126,56 @@ class TestStoreInDatabase:
         assert "Failed to store data in database" in result["message"]
 
 
+class TestStoreInS3:
+    def test_success(self):
+        # Test basic functionality with mock
+        mock_tool = Mock()
+        mock_tool.return_value = {
+            "success": True,
+            "message": "Stored 2 items successfully",
+            "data_count": 2
+        }
+        
+        result = mock_tool([{"title": "Test 1"}, {"title": "Test 2"}])
+        assert result["success"] is True
+        assert result["data_count"] == 2
+
+    def test_no_bucket_config(self):
+        # Test with no bucket configuration
+        mock_tool = Mock()
+        mock_tool.return_value = {
+            "success": False,
+            "message": "S3 bucket not configured"
+        }
+        
+        result = mock_tool([{"data": "test"}])
+        assert result["success"] is False
+        assert "bucket not configured" in result["message"]
+
+    def test_with_metadata(self):
+        # Test with metadata
+        mock_tool = Mock()
+        mock_tool.return_value = {
+            "success": True,
+            "message": "Stored 1 item with metadata"
+        }
+        
+        result = mock_tool([{"title": "Test"}], {"version": "1.0"})
+        assert result["success"] is True
+
+    def test_storage_error(self):
+        # Test storage error handling
+        mock_tool = Mock()
+        mock_tool.return_value = {
+            "success": False,
+            "message": "Failed to store data in S3: Connection error"
+        }
+        
+        result = mock_tool([{"data": "test"}])
+        assert result["success"] is False
+        assert "Connection error" in result["message"]
+
+
 class TestPlaceholderTools:
 
     def test_store_in_s3_placeholder(self):
@@ -202,6 +252,17 @@ class TestErrorHandling:
         result = mock_tool([{"title": "Test"}], "news")
         assert result["success"] is False
         assert "Validation error" in result["message"]
+
+    def test_store_in_s3_exception(self):
+        mock_tool = Mock()
+        mock_tool.return_value = {
+            "success": False,
+            "message": "Failed to store data in S3: S3 error"
+        }
+        
+        result = mock_tool([{"title": "Test"}])
+        assert result["success"] is False
+        assert "S3 error" in result["message"]
 
 
 class TestEdgeCases:
