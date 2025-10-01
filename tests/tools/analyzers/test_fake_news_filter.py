@@ -244,6 +244,150 @@ class TestFakeNewsFilter:
         assert len(result.data["results"]) == 2
         assert "error" in result.data["results"][1]
 
+    # Comprehensive coverage tests
+    @patch('boto3.client')
+    def test_boundary_values(self, mock_boto_client):
+        """Test boundary values for thresholds and scores"""
+        filter_tool = FakeNewsFilter(self.endpoint_name, self.region)
+        
+        # Test boundary threshold values
+        assert filter_tool._extract_credibility_score(0.0) == 0.0
+        assert filter_tool._extract_credibility_score(1.0) == 1.0
+        assert filter_tool._extract_credibility_score(-0.1) == 0.0  # Clamped
+        assert filter_tool._extract_credibility_score(1.1) == 1.0   # Clamped
+        
+        # Test edge case scores
+        assert filter_tool._interpret_labeled_score("REAL", 0.0) == 0.0
+        assert filter_tool._interpret_labeled_score("FAKE", 0.0) == 1.0
+        assert filter_tool._interpret_labeled_score("REAL", 1.0) == 1.0
+        assert filter_tool._interpret_labeled_score("FAKE", 1.0) == 0.0
+
+    @patch('boto3.client')
+    def test_all_response_formats(self, mock_boto_client):
+        """Test all possible response format branches"""
+        filter_tool = FakeNewsFilter(self.endpoint_name, self.region)
+        
+        # Empty list
+        assert filter_tool._extract_credibility_score([]) == 0.5
+        
+        # Nested structures (current implementation doesn't handle deep nesting)
+        assert filter_tool._extract_credibility_score([[0.8]]) == 0.5
+        
+        # Multiple score fields
+        assert filter_tool._extract_credibility_score({"confidence": 0.9}) == 0.9
+        assert filter_tool._extract_credibility_score({"probability": 0.8}) == 0.8
+        
+        # Mixed data types
+        assert filter_tool._extract_credibility_score([{"other": "data"}, 0.7]) == 0.7
+        
+        # String numbers
+        assert filter_tool._extract_credibility_score("0.6") == 0.5  # Fallback
+
+    @patch('boto3.client')
+    def test_label_variations(self, mock_boto_client):
+        """Test all label interpretation branches"""
+        filter_tool = FakeNewsFilter(self.endpoint_name, self.region)
+        
+        # Real indicators
+        real_labels = ["REAL", "TRUE", "CREDIBLE", "LEGITIMATE", "AUTHENTIC", "LABEL_0"]
+        for label in real_labels:
+            assert filter_tool._interpret_labeled_score(label, 0.8) == 0.8
+        
+        # Fake indicators
+        fake_labels = ["FAKE", "FALSE", "NOT_CREDIBLE", "ILLEGITIMATE", "LABEL_1"]
+        for label in fake_labels:
+            assert abs(filter_tool._interpret_labeled_score(label, 0.8) - 0.2) < 0.001
+        
+        # Unknown label (default behavior)
+        assert filter_tool._interpret_labeled_score("UNKNOWN", 0.8) == 0.8
+        
+        # Case insensitive and whitespace
+        assert filter_tool._interpret_labeled_score(" real ", 0.8) == 0.8
+        assert abs(filter_tool._interpret_labeled_score("fake", 0.8) - 0.2) < 0.001
+
+    @patch('boto3.client')
+    def test_error_conditions(self, mock_boto_client):
+        """Test all error handling branches"""
+        filter_tool = FakeNewsFilter(self.endpoint_name, self.region)
+        
+        # Invalid score types
+        assert filter_tool._extract_credibility_score({"score": "invalid"}) == 0.5
+        assert filter_tool._extract_credibility_score({"label": "REAL", "score": None}) == 0.5
+        
+        # Exception in interpretation
+        assert filter_tool._interpret_labeled_score(None, 0.8) == 0.8  # Handles None
+        
+        # Complex nested error
+        complex_response = {"nested": {"deep": {"score": "not_a_number"}}}
+        assert filter_tool._extract_credibility_score(complex_response) == 0.5
+
+    @patch('boto3.client')
+    def test_whitespace_content(self, mock_boto_client):
+        """Test whitespace-only content handling"""
+        filter_tool = FakeNewsFilter(self.endpoint_name, self.region)
+        
+        # Various whitespace scenarios
+        result = filter_tool.filter_content("   ", 0.7)
+        assert result.success is False
+        assert "Empty content" in result.message
+        
+        result = filter_tool.filter_content("\n\t\r", 0.7)
+        assert result.success is False
+        
+        result = filter_tool.filter_content("", 0.7)
+        assert result.success is False
+
+    @patch('boto3.client')
+    def test_threshold_edge_cases(self, mock_boto_client):
+        """Test threshold boundary conditions"""
+        mock_response = {"Body": Mock()}
+        mock_response["Body"].read.return_value.decode.return_value = json.dumps([
+            {"label": "REAL", "score": 0.7}
+        ])
+        
+        mock_runtime = Mock()
+        mock_runtime.invoke_endpoint.return_value = mock_response
+        mock_boto_client.return_value = mock_runtime
+        
+        filter_tool = FakeNewsFilter(self.endpoint_name, self.region)
+        
+        # Exact threshold match
+        result = filter_tool.filter_content("test", 0.7)
+        assert result.data["is_credible"] is True
+        
+        # Just below threshold
+        result = filter_tool.filter_content("test", 0.71)
+        assert result.data["is_credible"] is False
+        
+        # Extreme thresholds
+        result = filter_tool.filter_content("test", 0.0)
+        assert result.data["is_credible"] is True
+        
+        result = filter_tool.filter_content("test", 1.0)
+        assert result.data["is_credible"] is False
+
+    @patch('boto3.client')
+    def test_batch_empty_list(self, mock_boto_client):
+        """Test batch processing with empty list"""
+        filter_tool = FakeNewsFilter(self.endpoint_name, self.region)
+        result = filter_tool.batch_filter([], 0.7)
+        
+        assert result.success is True
+        assert result.data["total_items"] == 0
+        assert result.data["credible_count"] == 0
+        assert len(result.data["results"]) == 0
+
+    @patch('boto3.client')
+    def test_batch_exception_handling(self, mock_boto_client):
+        """Test batch processing exception handling"""
+        filter_tool = FakeNewsFilter(self.endpoint_name, self.region)
+        
+        # Mock filter_content to raise exception
+        with patch.object(filter_tool, 'filter_content', side_effect=Exception("Test error")):
+            result = filter_tool.batch_filter(["test"], 0.7)
+            assert result.success is False
+            assert "Failed to perform batch fake news analysis" in result.message
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

@@ -174,13 +174,13 @@ class FakeNewsFilter:
         label = str(label).upper().strip()
         score = max(0.0, min(1.0, float(score)))
         
+        # Fake/non-credible indicators (check first to handle NOT_CREDIBLE correctly)
+        if any(term in label for term in ["FAKE", "FALSE", "NOT_CREDIBLE", "ILLEGITIMATE", "LABEL_1"]):
+            return 1.0 - score
+        
         # Real/credible indicators
         if any(term in label for term in ["REAL", "TRUE", "CREDIBLE", "LEGITIMATE", "AUTHENTIC", "LABEL_0"]):
             return score
-        
-        # Fake/non-credible indicators  
-        if any(term in label for term in ["FAKE", "FALSE", "NOT_CREDIBLE", "ILLEGITIMATE", "LABEL_1"]):
-            return 1.0 - score
         
         # Default: assume higher score = more credible
         return score
