@@ -307,16 +307,18 @@ def store_in_database(categorized_data: Dict[str, List[Dict]]) -> Dict[str, Any]
 
 
 @tool
-def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None) -> Dict[str, Any]:
+def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None, knowledge_base_id: Optional[str] = None, data_source_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Store JSON data in S3 with prefix structure (country/year/month/day/data-source-name/)
+    Store JSON data in S3 with prefix structure and trigger Knowledge Base sync
 
     Args:
         data: Data to store in S3
         metadata: Optional metadata for RAG enhancement
+        knowledge_base_id: Bedrock Knowledge Base ID for sync
+        data_source_id: Knowledge Base data source ID for sync
 
     Returns:
-        Dictionary containing S3 storage results and paths
+        Dictionary containing S3 storage results and Knowledge Base sync status
     """
     try:
         config_manager = ConfigManager()
@@ -330,10 +332,16 @@ def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None) -> Dict[str, 
                 "has_metadata": metadata is not None,
             }
         
-        storage = S3Storage(s3_config)
+        # Get Knowledge Base config from environment or config
+        if not knowledge_base_id:
+            knowledge_base_id = config_manager.get_config_value("knowledge_base.knowledge_base_id")
+        if not data_source_id:
+            data_source_id = config_manager.get_config_value("knowledge_base.data_source_id")
+        
+        storage = S3Storage(s3_config, knowledge_base_id, data_source_id)
         response = storage.store_data(data, metadata)
         
-        logger.info(f"Stored {len(data)} items in S3")
+        logger.info(f"Stored {len(data)} items in S3 with Knowledge Base sync")
         return response.to_dict()
         
     except Exception as e:
@@ -386,6 +394,96 @@ def analyze_sentiment(content: str) -> Dict[str, Any]:
         "message": "Tool not yet implemented - will be available in task 5.2",
         "content_length": len(content),
     }
+
+
+@tool
+def trigger_knowledge_base_sync(knowledge_base_id: Optional[str] = None, data_source_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Manually trigger Knowledge Base synchronization
+
+    Args:
+        knowledge_base_id: Bedrock Knowledge Base ID
+        data_source_id: Knowledge Base data source ID
+
+    Returns:
+        Dictionary containing sync trigger results
+    """
+    try:
+        config_manager = ConfigManager()
+        s3_config = config_manager.get_s3_config()
+        
+        # Get Knowledge Base config from environment or config
+        if not knowledge_base_id:
+            knowledge_base_id = config_manager.get_config_value("knowledge_base.knowledge_base_id")
+        if not data_source_id:
+            data_source_id = config_manager.get_config_value("knowledge_base.data_source_id")
+        
+        if not knowledge_base_id or not data_source_id:
+            return {
+                "success": False,
+                "message": "Knowledge Base ID or Data Source ID not configured",
+                "knowledge_base_id": knowledge_base_id,
+                "data_source_id": data_source_id,
+            }
+        
+        storage = S3Storage(s3_config, knowledge_base_id, data_source_id)
+        sync_result = storage.trigger_knowledge_base_sync()
+        
+        return {
+            "success": sync_result,
+            "message": "Knowledge Base sync triggered successfully" if sync_result else "Failed to trigger Knowledge Base sync",
+            "knowledge_base_id": knowledge_base_id,
+            "data_source_id": data_source_id,
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in trigger_knowledge_base_sync: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to trigger Knowledge Base sync: {str(e)}",
+            "error": str(e),
+        }
+
+
+@tool
+def get_knowledge_base_sync_status(job_id: str, knowledge_base_id: Optional[str] = None, data_source_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Get the status of a Knowledge Base ingestion job
+
+    Args:
+        job_id: Ingestion job ID
+        knowledge_base_id: Bedrock Knowledge Base ID
+        data_source_id: Knowledge Base data source ID
+
+    Returns:
+        Dictionary containing job status information
+    """
+    try:
+        config_manager = ConfigManager()
+        s3_config = config_manager.get_s3_config()
+        
+        # Get Knowledge Base config from environment or config
+        if not knowledge_base_id:
+            knowledge_base_id = config_manager.get_config_value("knowledge_base.knowledge_base_id")
+        if not data_source_id:
+            data_source_id = config_manager.get_config_value("knowledge_base.data_source_id")
+        
+        storage = S3Storage(s3_config, knowledge_base_id, data_source_id)
+        status = storage.get_ingestion_job_status(job_id)
+        
+        return {
+            "success": "error" not in status,
+            "message": "Retrieved job status successfully" if "error" not in status else status["error"],
+            "job_status": status,
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in get_knowledge_base_sync_status: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to get sync status: {str(e)}",
+            "error": str(e),
+        }
 
 
 # Query Tools (to be implemented in task 6)
