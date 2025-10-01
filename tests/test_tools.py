@@ -176,6 +176,76 @@ class TestStoreInS3:
         assert "Connection error" in result["message"]
 
 
+class TestFakeNewsFilter:
+    def test_filter_fake_news_success(self):
+        mock_tool = Mock()
+        mock_tool.return_value = {
+            "success": True,
+            "message": "Content analysis completed. Credibility: 0.850",
+            "data": {
+                "credibility_score": 0.85,
+                "is_credible": True,
+                "threshold": 0.7,
+                "content_length": 20
+            }
+        }
+        
+        result = mock_tool("This is real news", 0.7)
+        assert result["success"] is True
+        assert result["data"]["credibility_score"] == 0.85
+        assert result["data"]["is_credible"] is True
+
+    def test_filter_fake_news_no_endpoint(self):
+        mock_tool = Mock()
+        mock_tool.return_value = {
+            "success": False,
+            "message": "SageMaker fake news endpoint not configured",
+            "content_length": 15,
+            "threshold": 0.7
+        }
+        
+        result = mock_tool("test content", 0.7)
+        assert result["success"] is False
+        assert "endpoint not configured" in result["message"]
+
+    def test_filter_fake_news_batch_success(self):
+        mock_tool = Mock()
+        mock_tool.return_value = {
+            "success": True,
+            "message": "Batch analysis completed: 2/3 items credible",
+            "data": {
+                "total_items": 3,
+                "credible_count": 2,
+                "threshold": 0.7,
+                "results": [
+                    {"index": 0, "credibility_score": 0.85, "is_credible": True},
+                    {"index": 1, "credibility_score": 0.45, "is_credible": False},
+                    {"index": 2, "credibility_score": 0.75, "is_credible": True}
+                ]
+            }
+        }
+        
+        contents = ["Real news 1", "Fake news", "Real news 2"]
+        result = mock_tool(contents, 0.7)
+        assert result["success"] is True
+        assert result["data"]["total_items"] == 3
+        assert result["data"]["credible_count"] == 2
+
+    def test_filter_fake_news_error(self):
+        mock_tool = Mock()
+        mock_tool.return_value = {
+            "success": False,
+            "message": "Failed to filter fake news: SageMaker error",
+            "content_length": 12,
+            "threshold": 0.7,
+            "error": "SageMaker error"
+        }
+        
+        result = mock_tool("test content", 0.7)
+        assert result["success"] is False
+        assert "SageMaker error" in result["error"]
+
+
 class TestPlaceholderTools:
 
     def test_store_in_s3_placeholder(self):
@@ -186,16 +256,6 @@ class TestPlaceholderTools:
         }
         
         result = mock_tool([{"data": "test"}])
-        assert result["success"] is False
-
-    def test_filter_fake_news_placeholder(self):
-        mock_tool = Mock()
-        mock_tool.return_value = {
-            "success": False,
-            "message": "Tool not yet implemented"
-        }
-        
-        result = mock_tool("test content")
         assert result["success"] is False
 
     def test_analyze_sentiment_placeholder(self):

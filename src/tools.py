@@ -20,11 +20,59 @@ from tools.processors.data_validator import DataValidator
 from tools.processors.data_formatter import DataFormatter
 from tools.storage.database_storage import DatabaseStorage
 from tools.storage.s3_storage import S3Storage
-# from tools.analyzers.fake_news_filter import FakeNewsFilter
+from tools.analyzers.fake_news_filter import FakeNewsFilter
 # from tools.analyzers.sentiment_analyzer import SentimentAnalyzer
 # from tools.query.rag_query import RAGQuery
 
 logger = logging.getLogger(__name__)
+
+
+def _filter_fake_news_from_data(data: List[Dict], threshold: float = 0.7) -> tuple[List[Dict], int]:
+    """
+    Internal function to filter fake news from data list
+    
+    Returns:
+        tuple: (filtered_data, filtered_count)
+    """
+    try:
+        config_manager = ConfigManager()
+        endpoint_name = config_manager.get_config_value("sagemaker.fake_news_endpoint")
+        region = config_manager.get_config_value("sagemaker.region", "us-east-1")
+        enable_filter = config_manager.get_config_value("pipeline.enable_fake_news_filter", False)
+        
+        if not enable_filter or not endpoint_name:
+            return data, 0
+        
+        filter_tool = FakeNewsFilter(endpoint_name, region)
+        filtered_data = []
+        filtered_count = 0
+        
+        for item in data:
+            # Extract content for analysis
+            content = ""
+            if "title" in item and "content" in item:
+                content = f"{item['title']}. {item['content']}"
+            elif "title" in item:
+                content = item["title"]
+            elif "content" in item:
+                content = item["content"]
+            
+            if content:
+                result = filter_tool.filter_content(content, threshold)
+                if result.success and result.data.get("is_credible", True):
+                    item["fake_news_score"] = result.data.get("credibility_score")
+                    filtered_data.append(item)
+                else:
+                    filtered_count += 1
+                    logger.info(f"Filtered fake news: {item.get('title', 'Unknown')[:50]}...")
+            else:
+                filtered_data.append(item)
+        
+        return filtered_data, filtered_count
+        
+    except Exception as e:
+        logger.error(f"Error in fake news filtering: {str(e)}")
+        return data, 0
 
 
 # Data Collection Tools (to be implemented in task 2)
@@ -241,7 +289,7 @@ def format_data(
 @tool
 def store_in_database(categorized_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
     """
-    Store categorized data in PostgreSQL/Aurora database
+    Store categorized data in PostgreSQL/Aurora database with fake news filtering
 
     Args:
         categorized_data: Data organized by categories (news, weather, etc.)
@@ -252,6 +300,7 @@ def store_in_database(categorized_data: Dict[str, List[Dict]]) -> Dict[str, Any]
     try:
         config_manager = ConfigManager()
         db_config = config_manager.get_database_config()
+        threshold = config_manager.get_config_value("pipeline.fake_news_threshold", 0.7)
         
         if not db_config.host or db_config.host == "your_db_host":
             return {
@@ -264,17 +313,24 @@ def store_in_database(categorized_data: Dict[str, List[Dict]]) -> Dict[str, Any]
         storage = DatabaseStorage(db_config)
         results = {}
         total_stored = 0
+        total_filtered = 0
         
-        # Store news data
+        # Store news data with fake news filtering
         if "news" in categorized_data:
             from tools.utilities.data_models import NewsArticle
-            news_articles = [NewsArticle.from_dict(item) for item in categorized_data["news"]]
+            
+            # Filter fake news before storing
+            filtered_news, filtered_count = _filter_fake_news_from_data(categorized_data["news"], threshold)
+            total_filtered += filtered_count
+            
+            news_articles = [NewsArticle.from_dict(item) for item in filtered_news]
             news_result = storage.store_news_data(news_articles)
             results["news"] = news_result.to_dict()
+            results["news"]["filtered_fake_news"] = filtered_count
             if news_result.success:
                 total_stored += news_result.data.get("stored_count", 0)
         
-        # Store weather data
+        # Store weather data (no filtering needed)
         if "weather" in categorized_data:
             from tools.utilities.data_models import WeatherData
             weather_data = [WeatherData.from_dict(item) for item in categorized_data["weather"]]
@@ -285,13 +341,18 @@ def store_in_database(categorized_data: Dict[str, List[Dict]]) -> Dict[str, Any]
         
         storage.close_connections()
         
-        logger.info(f"Stored {total_stored} items in database across {len(results)} categories")
+        message = f"Successfully stored {total_stored} items in database"
+        if total_filtered > 0:
+            message += f" (filtered {total_filtered} fake news items)"
+        
+        logger.info(message)
         return {
             "success": True,
-            "message": f"Successfully stored {total_stored} items in database",
+            "message": message,
             "categories": list(categorized_data.keys()),
             "total_items": sum(len(items) for items in categorized_data.values()),
             "total_stored": total_stored,
+            "total_filtered": total_filtered,
             "results": results,
         }
         
@@ -309,7 +370,7 @@ def store_in_database(categorized_data: Dict[str, List[Dict]]) -> Dict[str, Any]
 @tool
 def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None, knowledge_base_id: Optional[str] = None, data_source_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Store JSON data in S3 with prefix structure and trigger Knowledge Base sync
+    Store JSON data in S3 with prefix structure and trigger Knowledge Base sync, with fake news filtering
 
     Args:
         data: Data to store in S3
@@ -323,6 +384,7 @@ def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None, knowledge_bas
     try:
         config_manager = ConfigManager()
         s3_config = config_manager.get_s3_config()
+        threshold = config_manager.get_config_value("pipeline.fake_news_threshold", 0.7)
         
         if not s3_config.bucket_name:
             return {
@@ -332,6 +394,9 @@ def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None, knowledge_bas
                 "has_metadata": metadata is not None,
             }
         
+        # Filter fake news before storing
+        filtered_data, filtered_count = _filter_fake_news_from_data(data, threshold)
+        
         # Get Knowledge Base config from environment or config
         if not knowledge_base_id:
             knowledge_base_id = config_manager.get_config_value("knowledge_base.knowledge_base_id")
@@ -339,9 +404,18 @@ def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None, knowledge_bas
             data_source_id = config_manager.get_config_value("knowledge_base.data_source_id")
         
         storage = S3Storage(s3_config, knowledge_base_id, data_source_id)
-        response = storage.store_data(data, metadata)
+        response = storage.store_data(filtered_data, metadata)
         
-        logger.info(f"Stored {len(data)} items in S3 with Knowledge Base sync")
+        # Add filtering info to response
+        if response.success and response.data:
+            response.data["total_filtered"] = filtered_count
+            response.data["original_count"] = len(data)
+        
+        message = f"Stored {len(filtered_data)} items in S3 with Knowledge Base sync"
+        if filtered_count > 0:
+            message += f" (filtered {filtered_count} fake news items)"
+        
+        logger.info(message)
         return response.to_dict()
         
     except Exception as e:
@@ -355,7 +429,7 @@ def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None, knowledge_bas
         }
 
 
-# Analysis Tools (to be implemented in task 5)
+# Analysis Tools
 @tool
 def filter_fake_news(content: str, threshold: float = 0.7) -> Dict[str, Any]:
     """
@@ -368,13 +442,76 @@ def filter_fake_news(content: str, threshold: float = 0.7) -> Dict[str, Any]:
     Returns:
         Dictionary containing credibility score and filter decision
     """
-    logger.info("Tool placeholder: filter_fake_news")
-    return {
-        "success": False,
-        "message": "Tool not yet implemented - will be available in task 5.1",
-        "content_length": len(content),
-        "threshold": threshold,
-    }
+    try:
+        config_manager = ConfigManager()
+        endpoint_name = config_manager.get_config_value("sagemaker.fake_news_endpoint")
+        region = config_manager.get_config_value("sagemaker.region", "us-east-1")
+        
+        if not endpoint_name:
+            return {
+                "success": False,
+                "message": "SageMaker fake news endpoint not configured. Please set endpoint in config.json",
+                "content_length": len(content),
+                "threshold": threshold,
+            }
+        
+        filter_tool = FakeNewsFilter(endpoint_name, region)
+        response = filter_tool.filter_content(content, threshold)
+        
+        logger.info(f"Filtered content for fake news: credibility score available")
+        return response.to_dict()
+        
+    except Exception as e:
+        logger.error(f"Error in filter_fake_news: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to filter fake news: {str(e)}",
+            "content_length": len(content),
+            "threshold": threshold,
+            "error": str(e),
+        }
+
+
+@tool
+def filter_fake_news_batch(contents: List[str], threshold: float = 0.7) -> Dict[str, Any]:
+    """
+    Filter multiple content items for fake news using SageMaker endpoint
+
+    Args:
+        contents: List of text content to analyze
+        threshold: Credibility threshold (0.0 to 1.0)
+
+    Returns:
+        Dictionary containing batch analysis results
+    """
+    try:
+        config_manager = ConfigManager()
+        endpoint_name = config_manager.get_config_value("sagemaker.fake_news_endpoint")
+        region = config_manager.get_config_value("sagemaker.region", "us-east-1")
+        
+        if not endpoint_name:
+            return {
+                "success": False,
+                "message": "SageMaker fake news endpoint not configured. Please set endpoint in config.json",
+                "total_items": len(contents),
+                "threshold": threshold,
+            }
+        
+        filter_tool = FakeNewsFilter(endpoint_name, region)
+        response = filter_tool.batch_filter(contents, threshold)
+        
+        logger.info(f"Batch filtered {len(contents)} items for fake news")
+        return response.to_dict()
+        
+    except Exception as e:
+        logger.error(f"Error in filter_fake_news_batch: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to batch filter fake news: {str(e)}",
+            "total_items": len(contents),
+            "threshold": threshold,
+            "error": str(e),
+        }
 
 
 @tool
