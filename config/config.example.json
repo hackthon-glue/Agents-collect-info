@@ -45,9 +45,13 @@
   },
   
   "knowledge_base": {
+    "knowledge_base_id": "your_knowledge_base_id",
+    "data_source_id": "your_data_source_id",
     "opensearch_endpoint": "your_opensearch_endpoint",
     "index_name": "strands-data",
-    "enable_sync": true
+    "enable_sync": true,
+    "sync_on_upload": true,
+    "max_sync_retries": 3
   },
   
   "sagemaker": {

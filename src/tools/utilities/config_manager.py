@@ -98,9 +98,13 @@ class ConfigManager:
             },
             # Knowledge Base configuration
             "knowledge_base": {
+                "knowledge_base_id": "",
+                "data_source_id": "",
                 "opensearch_endpoint": "",
                 "index_name": "strands-data",
                 "enable_sync": True,
+                "sync_on_upload": True,
+                "max_sync_retries": 3,
             },
             # SageMaker configuration (for fake news filtering)
             "sagemaker": {"fake_news_endpoint": "", "region": "us-east-1"},
@@ -175,6 +179,10 @@ class ConfigManager:
 
         # Knowledge Base configuration
         kb_config = {}
+        if os.getenv("KNOWLEDGE_BASE_ID"):
+            kb_config["knowledge_base_id"] = os.getenv("KNOWLEDGE_BASE_ID")
+        if os.getenv("DATA_SOURCE_ID"):
+            kb_config["data_source_id"] = os.getenv("DATA_SOURCE_ID")
         if os.getenv("OPENSEARCH_ENDPOINT"):
             kb_config["opensearch_endpoint"] = os.getenv("OPENSEARCH_ENDPOINT")
         if kb_config:
