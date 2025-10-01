@@ -69,7 +69,7 @@
   - Write unit tests with test database setup
   - _Requirements: 4.2, 4.3, 4.4_
 
-- [ ] 4.2 Create S3 storage tool
+- [x] 4.2 Create S3 storage tool
 
   - Implement S3Storage class in tools/storage/s3_storage.py
   - Implement prefix structure: country/year/month/day/data-source-name/
