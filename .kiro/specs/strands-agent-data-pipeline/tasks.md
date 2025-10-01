@@ -51,7 +51,7 @@
   - Write unit tests for data transformation and timezone handling
   - _Requirements: 3.1, 3.4_
 
-- [x] 3.3 Create data categorization tool (already done in section2)
+- [-] 3.3 Create data categorization tool (already done in section2)
 
   - Implement DataCategorizer class in tools/processors/data_categorizer.py
   - Categorize data into news, weather, economic indicators, social media, other
@@ -60,7 +60,7 @@
   - _Requirements: 4.1_
 
 - [ ] 4. Implement storage tools
-- [ ] 4.1 Create database storage tool
+- [x] 4.1 Create database storage tool
 
   - Implement DatabaseStorage class in tools/storage/database_storage.py
   - Create PostgreSQL table schemas for different data categories
