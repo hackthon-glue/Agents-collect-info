@@ -35,13 +35,14 @@ class NewsArticle:
     title: str
     summary: str
     url: str
-    publishedAt: str
+    published_at: str
     content: str
-    collectAt: str
-    sourceType: int
+    collected_at: str
+    source_type: int
     country: str = "us"
     category: str = "general"
     source_name: str = ""
+    fake_news_score: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -50,13 +51,14 @@ class NewsArticle:
             "title": self.title,
             "summary": self.summary,
             "url": self.url,
-            "publishedAt": self.publishedAt,
+            "published_at": self.published_at,
             "content": self.content,
-            "collectAt": self.collectAt,
-            "sourceType": self.sourceType,
+            "collected_at": self.collected_at,
+            "source_type": self.source_type,
             "country": self.country,
             "category": self.category,
             "source_name": self.source_name,
+            "fake_news_score": self.fake_news_score,
         }
 
     @classmethod
@@ -67,14 +69,28 @@ class NewsArticle:
             title=data.get("title", ""),
             summary=data.get("summary", ""),
             url=data.get("url", ""),
-            publishedAt=data.get("publishedAt", ""),
+            published_at=data.get("published_at", ""),
             content=data.get("content", ""),
-            collectAt=data.get("collectAt", ""),
-            sourceType=data.get("sourceType", 0),
+            collected_at=data.get("collected_at", ""),
+            source_type=data.get("source_type", 0),
             country=data.get("country", "us"),
             category=data.get("category", "general"),
             source_name=data.get("source_name", ""),
+            fake_news_score=data.get("fake_news_score"),
         )
+
+    # Backward compatibility properties
+    @property
+    def publishedAt(self) -> str:
+        return self.published_at
+    
+    @property
+    def collectAt(self) -> str:
+        return self.collected_at
+    
+    @property
+    def sourceType(self) -> int:
+        return self.source_type
 
 
 @dataclass
@@ -95,10 +111,13 @@ class WeatherData:
     wind_deg: int
     clouds: int
     visibility: int
-    collectAt: str
-    sourceType: int = 0
+    collected_at: str
+    source_type: int = 0
     latitude: float = 0.0
     longitude: float = 0.0
+    published_at: Optional[str] = None
+    sunrise_time: Optional[str] = None
+    sunset_time: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -117,10 +136,13 @@ class WeatherData:
             "wind_deg": self.wind_deg,
             "clouds": self.clouds,
             "visibility": self.visibility,
-            "collectAt": self.collectAt,
-            "sourceType": self.sourceType,
+            "collected_at": self.collected_at,
+            "source_type": self.source_type,
             "latitude": self.latitude,
             "longitude": self.longitude,
+            "published_at": self.published_at,
+            "sunrise_time": self.sunrise_time,
+            "sunset_time": self.sunset_time,
         }
 
     @classmethod
@@ -141,11 +163,23 @@ class WeatherData:
             wind_deg=data.get("wind_deg", 0),
             clouds=data.get("clouds", 0),
             visibility=data.get("visibility", 0),
-            collectAt=data.get("collectAt", ""),
-            sourceType=data.get("sourceType", 0),
+            collected_at=data.get("collected_at", ""),
+            source_type=data.get("source_type", 0),
             latitude=data.get("latitude", 0.0),
             longitude=data.get("longitude", 0.0),
+            published_at=data.get("published_at"),
+            sunrise_time=data.get("sunrise_time"),
+            sunset_time=data.get("sunset_time"),
         )
+
+    # Backward compatibility properties
+    @property
+    def collectAt(self) -> str:
+        return self.collected_at
+    
+    @property
+    def sourceType(self) -> int:
+        return self.source_type
 
 
 @dataclass
