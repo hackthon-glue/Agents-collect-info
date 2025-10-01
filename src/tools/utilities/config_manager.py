@@ -72,25 +72,19 @@ class ConfigManager:
             },
             # API configuration
             "apis": {
-                "news_api_key": "",
-                "weather_api_key": "",
                 "rate_limit_requests_per_minute": 60,
                 "request_timeout": 30,
             },
             # Database configuration
             "database": {
-                "host": "localhost",
                 "port": 5432,
                 "database": "strands_data",
-                "username": "",
-                "password": "",
                 "ssl_mode": "require",
                 "connection_pool_size": 10,
                 "connection_timeout": 30,
             },
             # S3 configuration
             "s3": {
-                "bucket_name": "",
                 "region": "us-east-1",
                 "prefix_template": "{country}/{year}/{month}/{day}/{source_name}/",
                 "enable_versioning": True,
@@ -144,7 +138,7 @@ class ConfigManager:
         if os.getenv("STRANDS_LOG_LEVEL"):
             env_config["log_level"] = os.getenv("STRANDS_LOG_LEVEL")
 
-        # API keys
+        # API keys (sensitive)
         api_config = {}
         if os.getenv("NEWS_API_KEY"):
             api_config["news_api_key"] = os.getenv("NEWS_API_KEY")
@@ -153,14 +147,10 @@ class ConfigManager:
         if api_config:
             env_config["apis"] = api_config
 
-        # Database configuration
+        # Database credentials (sensitive)
         db_config = {}
         if os.getenv("DB_HOST"):
             db_config["host"] = os.getenv("DB_HOST")
-        if os.getenv("DB_PORT"):
-            db_config["port"] = int(os.getenv("DB_PORT"))
-        if os.getenv("DB_NAME"):
-            db_config["database"] = os.getenv("DB_NAME")
         if os.getenv("DB_USERNAME"):
             db_config["username"] = os.getenv("DB_USERNAME")
         if os.getenv("DB_PASSWORD"):
@@ -168,25 +158,12 @@ class ConfigManager:
         if db_config:
             env_config["database"] = db_config
 
-        # S3 configuration
+        # S3 bucket name (sensitive)
         s3_config = {}
         if os.getenv("S3_BUCKET_NAME"):
             s3_config["bucket_name"] = os.getenv("S3_BUCKET_NAME")
-        if os.getenv("S3_REGION"):
-            s3_config["region"] = os.getenv("S3_REGION")
         if s3_config:
             env_config["s3"] = s3_config
-
-        # Knowledge Base configuration
-        kb_config = {}
-        if os.getenv("KNOWLEDGE_BASE_ID"):
-            kb_config["knowledge_base_id"] = os.getenv("KNOWLEDGE_BASE_ID")
-        if os.getenv("DATA_SOURCE_ID"):
-            kb_config["data_source_id"] = os.getenv("DATA_SOURCE_ID")
-        if os.getenv("OPENSEARCH_ENDPOINT"):
-            kb_config["opensearch_endpoint"] = os.getenv("OPENSEARCH_ENDPOINT")
-        if kb_config:
-            env_config["knowledge_base"] = kb_config
 
         # SageMaker configuration
         sm_config = {}
@@ -250,7 +227,7 @@ class ConfigManager:
         db_config = config.get("database", {})
 
         return DatabaseConfig(
-            host=db_config.get("host", "localhost"),
+            host=db_config.get("host", ""),
             port=db_config.get("port", 5432),
             database=db_config.get("database", "strands_data"),
             username=db_config.get("username", ""),
