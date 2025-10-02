@@ -116,7 +116,7 @@
   - _Requirements: 11.1, 11.2, 11.3, 11.4_
 
 - [ ] 7. Implement main agent and pipeline orchestration
-- [ ] 7.1 Create main agent class
+- [x] 7.1 Create main agent class
 
   - Implement StrandsDataPipelineAgent class in agent.py
   - Create execute_data_pipeline method that orchestrates all tools
@@ -133,8 +133,8 @@
   - Write unit tests for metadata generation and storage
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-- [ ] 8. Implement scheduled execution support (optional)
-- [ ] 8.1 Add scheduling capabilities
+- [-] 8. Implement scheduled execution support (optional)
+- [-] 8.1 Add scheduling capabilities
 
   - Create scheduler utility in tools/utilities/ for periodic execution
   - Implement configuration for scheduled prompts and intervals
