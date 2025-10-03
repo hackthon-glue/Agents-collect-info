@@ -21,6 +21,7 @@ from tools.processors.data_formatter import DataFormatter
 from tools.storage.database_storage import DatabaseStorage
 from tools.storage.s3_storage import S3Storage
 from tools.analyzers.fake_news_filter import FakeNewsFilter
+from tools.processors.metadata_generator import MetadataGenerator
 # from tools.analyzers.sentiment_analyzer import SentimentAnalyzer
 # from tools.query.rag_query import RAGQuery
 
@@ -368,15 +369,16 @@ def store_in_database(categorized_data: Dict[str, List[Dict]]) -> Dict[str, Any]
 
 
 @tool
-def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None, knowledge_base_id: Optional[str] = None, data_source_id: Optional[str] = None) -> Dict[str, Any]:
+def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None, knowledge_base_id: Optional[str] = None, data_source_id: Optional[str] = None, enable_metadata_generation: bool = True) -> Dict[str, Any]:
     """
-    Store JSON data in S3 with prefix structure and trigger Knowledge Base sync, with fake news filtering
+    Store JSON data in S3 with prefix structure and trigger Knowledge Base sync, with fake news filtering and metadata generation
 
     Args:
         data: Data to store in S3
         metadata: Optional metadata for RAG enhancement
         knowledge_base_id: Bedrock Knowledge Base ID for sync
         data_source_id: Knowledge Base data source ID for sync
+        enable_metadata_generation: Generate AI metadata for RAG optimization
 
     Returns:
         Dictionary containing S3 storage results and Knowledge Base sync status
@@ -403,17 +405,24 @@ def store_in_s3(data: List[Dict], metadata: Optional[Dict] = None, knowledge_bas
         if not data_source_id:
             data_source_id = config_manager.get_config_value("knowledge_base.data_source_id")
         
-        storage = S3Storage(s3_config, knowledge_base_id, data_source_id)
+        # Check if metadata generation is enabled in config
+        if enable_metadata_generation is None:
+            enable_metadata_generation = config_manager.get_config_value("pipeline.enable_metadata_generation", True)
+        
+        storage = S3Storage(s3_config, knowledge_base_id, data_source_id, enable_metadata_generation)
         response = storage.store_data(filtered_data, metadata)
         
         # Add filtering info to response
         if response.success and response.data:
             response.data["total_filtered"] = filtered_count
             response.data["original_count"] = len(data)
+            response.data["metadata_generation_enabled"] = enable_metadata_generation
         
         message = f"Stored {len(filtered_data)} items in S3 with Knowledge Base sync"
         if filtered_count > 0:
             message += f" (filtered {filtered_count} fake news items)"
+        if enable_metadata_generation:
+            message += " with AI metadata"
         
         logger.info(message)
         return response.to_dict()
@@ -624,6 +633,37 @@ def get_knowledge_base_sync_status(job_id: str, knowledge_base_id: Optional[str]
 
 
 # Query Tools (to be implemented in task 6)
+@tool
+def generate_metadata(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate RAG-optimized metadata for a data item
+
+    Args:
+        data: Data item to generate metadata for
+
+    Returns:
+        Dictionary containing generated metadata (summary, keywords, semantic tags)
+    """
+    try:
+        config_manager = ConfigManager()
+        region = config_manager.get_config_value("aws.region", "us-east-1")
+        model_id = config_manager.get_config_value("bedrock.metadata_model_id", "amazon.nova-lite-v1:0")
+        
+        generator = MetadataGenerator(region=region, model_id=model_id)
+        response = generator.generate_metadata(data)
+        
+        logger.info("Generated metadata for data item")
+        return response.to_dict()
+        
+    except Exception as e:
+        logger.error(f"Error in generate_metadata: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to generate metadata: {str(e)}",
+            "error": str(e),
+        }
+
+
 @tool
 def query_rag(query: str, max_results: int = 5) -> Dict[str, Any]:
     """

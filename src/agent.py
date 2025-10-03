@@ -36,6 +36,7 @@ agent = Agent(
         filter_fake_news,
         filter_fake_news_batch,
         analyze_sentiment,
+        generate_metadata,
         query_rag,
         trigger_knowledge_base_sync,
         get_knowledge_base_sync_status,
