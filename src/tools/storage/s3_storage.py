@@ -16,15 +16,17 @@ import time
 
 from ..utilities.data_models import ToolResponse, S3StorageConfig
 from ..utilities.error_handler import ErrorHandler
+from ..processors.metadata_generator import MetadataGenerator
 
 
 class S3Storage:
     """S3 storage handler with retry mechanisms and structured prefixes"""
 
-    def __init__(self, config: S3StorageConfig, knowledge_base_id: Optional[str] = None, data_source_id: Optional[str] = None):
+    def __init__(self, config: S3StorageConfig, knowledge_base_id: Optional[str] = None, data_source_id: Optional[str] = None, enable_metadata_generation: bool = False):
         self.config = config
         self.knowledge_base_id = knowledge_base_id
         self.data_source_id = data_source_id
+        self.enable_metadata_generation = enable_metadata_generation
         self.logger = logging.getLogger(__name__)
         self.error_handler = ErrorHandler()
 
@@ -32,6 +34,8 @@ class S3Storage:
             self.s3_client = boto3.client("s3", region_name=config.region)
             if knowledge_base_id:
                 self.bedrock_agent_client = boto3.client("bedrock-agent", region_name=config.region)
+            if enable_metadata_generation:
+                self.metadata_generator = MetadataGenerator(region=config.region)
         except NoCredentialsError:
             self.logger.error("AWS credentials not configured")
             raise
@@ -124,12 +128,23 @@ class S3Storage:
         filename = f"{title_hash}_{timestamp}.json"
         s3_key = f"{prefix}{filename}"
 
+        # Generate AI metadata if enabled
+        ai_metadata = {}
+        if self.enable_metadata_generation:
+            try:
+                result = self.metadata_generator.generate_metadata(item)
+                if result.success:
+                    ai_metadata = result.data
+            except Exception as e:
+                self.logger.warning(f"Metadata generation failed: {str(e)}")
+
         # Prepare data for storage
         storage_data = {
             "metadata": {
                 "stored_at": datetime.now(timezone.utc).isoformat(),
                 "prefix": prefix,
                 **(metadata or {}),
+                **(ai_metadata if ai_metadata else {}),
             },
             "data": item,
         }
