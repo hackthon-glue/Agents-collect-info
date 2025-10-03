@@ -115,7 +115,7 @@
   - Write unit tests for query processing and response generation
   - _Requirements: 11.1, 11.2, 11.3, 11.4_
 
-- [ ] 7. Implement main agent and pipeline orchestration
+- [x] 7. Implement main agent and pipeline orchestration
 - [x] 7.1 Create main agent class
 
   - Implement StrandsDataPipelineAgent class in agent.py
@@ -125,7 +125,7 @@
   - Write integration tests for complete pipeline execution
   - _Requirements: 12.1, 12.2, 12.3_
 
-- [ ] 7.2 Add optional metadata generation for RAG
+- [x] 7.2 Add optional metadata generation for RAG
 
   - Extend S3Storage to generate metadata (summary, keywords, semantic tags)
   - Store metadata alongside JSON files for improved RAG search
